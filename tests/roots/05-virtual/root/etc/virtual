@@ -1,0 +1,13 @@
+# note order here doesn't matter
+
+# first priority - full addresses
+bob@domain1.domains bob_jones
+
+# second priority - users
+bob bob_smith
+
+# third priority - domains
+@domain1.domains bob_jones
+@domain2.domains bob_smith
+@domain3.domains alice
+

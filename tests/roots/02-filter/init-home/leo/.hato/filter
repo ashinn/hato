@@ -1,0 +1,9 @@
+; -*- scheme -*-
+
+(cond
+ ((To? "300@little.endian")
+  "work-list/."))
+
+;; (cond
+;;  ((auto-list)))
+
