@@ -1,6 +1,6 @@
 ;;;; hato-base64.scm -- permissive RFC3548 base64 implementation
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; Procedure: base64-encode-string str
@@ -28,17 +28,25 @@
 
 ;; This API is compatible with the Gauche library rfc.base64.
 
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (fixnum)
-   (export
-    base64-encode base64-encode-string
-    base64-decode base64-decode-string
-    base64-encode-header)))
- (else))
+;; (cond-expand
+;;  ((and compiling (not static))
+;;   (declare
+;;    (fixnum)
+;;    (export
+;;     base64-encode base64-encode-string
+;;     base64-decode base64-decode-string
+;;     base64-encode-header)))
+;;  (else))
 
-(use extras)
+;; (use extras)
+
+(module
+ hato-base64
+ (base64-encode base64-encode-string
+  base64-decode base64-decode-string
+  base64-encode-header)
+
+ (import scheme chicken extras data-structures)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; from SRFI-33
@@ -355,3 +363,5 @@
                                             effective-max-col)
                                (string-append "?=" nl "\t" prefix))
            "?=")))))
+
+)

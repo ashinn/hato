@@ -1,6 +1,6 @@
 ;;;; hato-smtp.scm -- simple SMTP module
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; Easy mail interface.
@@ -58,22 +58,21 @@
 ;; send-mail returns the list of recipients who couldn't be delivered to
 ;; (i.e. a null list when there are no errors).
 
-(cond-expand
- ((and chicken compiling (not static))
-  (declare
-   (export send-mail mime-encode-header mime-choose-encoding
-           smtp-write-message smtp-write-headers smtp-write-mime-part
-           smtp-generate-msgid smtp-generate-boundary
-           smtp-open smtp-close smtp-quit smtp-starttls smtp-helo
-           smtp-mail smtp-rcpt smtp-data smtp-noop smtp-reset
-           smtp-verify smtp-expand smtp-mail-from smtp-recipient
-           smtp-status smtp-message smtp-help smtp?
-           domain-part local-part)))
- (else))
+(require-library autoload srfi-1 dns
+                 hato-archive hato-mime hato-base64 quoted-printable)
 
-(use
- autoload posix tcp dns extras utils srfi-1
- hato-archive hato-mime hato-base64 quoted-printable)
+(module hato-smtp
+ (send-mail mime-encode-header mime-choose-encoding
+  smtp-write-message smtp-write-headers smtp-write-mime-part
+  smtp-generate-msgid smtp-generate-boundary
+  smtp-open smtp-close smtp-quit smtp-starttls smtp-helo
+  smtp-mail smtp-rcpt smtp-data smtp-noop smtp-reset
+  smtp-verify smtp-expand smtp-mail-from smtp-recipient
+  smtp-status smtp-message smtp-help smtp?
+  domain-part local-part)
+
+(import autoload posix tcp dns extras utils srfi-1
+        hato-archive hato-mime hato-base64 quoted-printable)
 
 (autoload charconv ces-convert)
 (autoload ssl ssl-wrap unwrap-tcp-ports)
@@ -586,3 +585,4 @@
                  (else (smtp-write-data str port Newline)))
                 (display Newline port)))))))
 
+)

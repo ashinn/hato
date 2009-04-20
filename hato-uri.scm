@@ -1,23 +1,20 @@
 ;;;; hato-uri.scm -- URI parsing/building library
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use extras)
+(module hato-uri
+  (uri->string make-uri string->uri
+   uri-scheme uri-user uri-host uri-port
+   uri-path uri-query uri-fragment
+   uri-with-scheme uri-with-user uri-with-host uri-with-path
+   uri-with-query uri-with-fragment uri-with-port
+   uri-encode uri-decode
+   uri-query->alist uri-alist->query)
 
-(cond-expand
- ((and chicken compiling)
-  (declare
-   (export uri->string make-uri string->uri
-           uri-scheme uri-user uri-host uri-port
-           uri-path uri-query uri-fragment
-           uri-with-scheme uri-with-user uri-with-host uri-with-path
-           uri-with-query uri-with-fragment uri-with-port
-           uri-encode uri-decode
-           uri-query->alist uri-alist->query)))
- (else))
+(import scheme chicken)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -290,3 +287,5 @@
               key)))
       ls)
      "&")))
+
+)

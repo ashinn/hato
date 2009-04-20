@@ -1,6 +1,6 @@
 ;;;; hato-archive.scm -- mbox, MH and Maildir utilities
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; Procedure: mail-archive-add archive [message] [format] [headers]
@@ -62,20 +62,17 @@
 ;;   Parses a comma-delimited list of email addresses, each parsed
 ;;   according to parse-mail-address.
 
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (export mail-archive-add mail-archive-remove mail-archive-read
-           mail-archive-fold mail-archive-for-each mail-archive->list
-           mail-archive-format
-           mh-next-name maildir-next-name generate-maildir-name
-           parse-mail-address parse-mail-address-list
-           create-maildir
-           current-mbox-date-string
-           )))
- (else))
+(module hato-archive
+  (mail-archive-add mail-archive-remove mail-archive-read
+   mail-archive-fold mail-archive-for-each mail-archive->list
+   mail-archive-format
+   mh-next-name maildir-next-name generate-maildir-name
+   parse-mail-address parse-mail-address-list
+   create-maildir
+   current-mbox-date-string
+   )
 
-(use posix hato-mime extras utils regex srfi-1)
+(import posix extras utils regex srfi-1 hato-mime)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -572,3 +569,4 @@
   (reverse
    (mail-archive-fold src (lambda (f text res) (cons text res)) '())))
 
+)

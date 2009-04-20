@@ -1,6 +1,6 @@
 ;;;; hato-pop.scm -- pop3 client library
 ;;
-;; Copyright (c) 2003-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2003-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; Easy to use POP3 (RFC 1939) library, with support for APOP and SSL,
@@ -9,9 +9,19 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use autoload tcp extras utils srfi-1 hato-mime)
+(require-library autoload tcp hato-mime)
+
+(module hato-pop
+  (pop3-connect pop3-disconnect pop3-open pop3-open-ssl pop3?
+   pop3-apop pop3-auth pop3-dele pop3-disconnect
+   pop3-list pop3-noop pop3-open pop3-pass pop3-quit
+   pop3-retr pop3-rset pop3-stat pop3-top pop3-uidl pop3-user
+   pop3-resp pop3-retr->string pop3-top->string pop3-headers)
+
+(import scheme chicken extras utils srfi-1  tcp autoload hato-mime)
+
 (autoload openssl ssl-connect)
-(autoload md5 md5:digest)
+(autoload hato-md5 md5-digest)
 
 (define-record-type pop3
   (make-pop3 in out debug? timestamp resp locked)
@@ -23,18 +33,6 @@
   (resp pop3-resp pop3-resp-set!)
   (locked pop3-locked pop3-locked-set!)
   )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(cond-expand
- ((and chicken compiling)
-  (declare
-   (export pop3-connect pop3-disconnect pop3-open pop3-open-ssl pop3?
-           pop3-apop pop3-auth pop3-dele pop3-disconnect
-           pop3-list pop3-noop pop3-open pop3-pass pop3-quit
-           pop3-retr pop3-rset pop3-stat pop3-top pop3-uidl pop3-user
-           pop3-resp pop3-retr->string pop3-top->string pop3-headers)))
- (else))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Chicken's pop3 egg compatibility
@@ -124,7 +122,7 @@
 
 (define (pop3-apop pop user key)
   (let ((ts (pop3-timestamp pop)))
-    (and ts (pop3-send pop 'APOP user (md5:digest (string-append ts key))))))
+    (and ts (pop3-send pop 'APOP user (md5-digest (string-append ts key))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; low-level commands
@@ -275,3 +273,4 @@
 (define (pop3-headers pop msg)
   (call-with-pop3-top pop msg 1 mime-headers->list))
 
+)

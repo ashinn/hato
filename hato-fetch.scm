@@ -1,21 +1,33 @@
 #!/usr/local/bin/csi -script
 ;;;; hato-fetch.scm -- fetchmail replacement
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(include "let-args.scm")
-(include "hato-log.scm")
-(use autoload numbers posix gdbm extras utils regex srfi-1 srfi-13 srfi-69
-     hato-archive hato-uri hato-pop hato-imap hato-smtp hato-mime
-     hato-config hato-filter hato-date hato-daemon hato-db domain-keys)
-(autoload stty (with-stty #f (lambda (x thunk) (thunk))))
+(require-extension
+ numbers posix tokyocabinet extras utils regex srfi-1 srfi-13 srfi-69
+ hato-archive hato-uri hato-pop hato-imap hato-smtp hato-mime
+ hato-config hato-filter hato-date hato-daemon hato-db hato-log
+ domain-keys let-args)
+
+(define-logger (current-log-level set-current-log-level! log-info)
+  (log-emergency ; the server is on fire!!!           
+   log-alert     ; couldn't write to user mailbox     
+   log-critical  ; couldn't run 'dig' executable      
+   log-error     ; error loading user filter          
+   log-warn      ; invalid smtp command; relay failed 
+   log-notice    ; saved to file/relayed to address   
+   log-info      ; loaded alias file                  
+   log-debug))   ; spam-probability: 0.5
+
+(define (with-stty x thunk) (thunk))
 
 (define *program-name* "hato-fetch")
-(define-macro (read-version)
-  (call-with-input-file "VERSION" read-line))
+(define-syntax read-version
+  (er-macro-transformer
+   (lambda (e r c) (call-with-input-file "VERSION" read-line))))
 (define *program-version* (read-version))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

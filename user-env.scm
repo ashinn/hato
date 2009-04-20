@@ -1,6 +1,6 @@
 ;;;; user-env.scm -- safe user environments
 ;;
-;; Copyright (c) 2005 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; This is an extension of sandbox that lets you create
@@ -24,11 +24,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (export make-user-environment touch-file)))
- (else))
+(module user-env
+ (make-user-environment touch-file)
 
 (require-extension sandbox posix)
 
@@ -193,3 +190,4 @@
      '(%open-input-file %open-output-file %touch-file))
     e))
 
+ )

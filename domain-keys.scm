@@ -1,6 +1,6 @@
 ;; domain-keys.scm -- Yahoo DomainKeys
 ;;
-;; Copyright (c) 2005 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; Procedure: domain-key-verify mail-text

@@ -1,33 +1,16 @@
 syntax: glob
-*.orig
 *.rej
-*~
-*.c
-*.o
-*.so
-*.aux
-*.log
-*.hlog
 *.lof
 *.lot
 *.pdf
-*.elc
-*.err
-PROFILE.*
 *.tar.bz2
 *.tar.gz
 *.tgz
-.Z-*.scm
 hato-manual.html
-*-Z-*.html
-*-Z-*.css
-*.exports
-*.plt
 hato-mta
 hato-fetch
 hato-classify
 
 syntax: regexp
-.*\#.*\#$
 (^|/)roots/[^/]*/root/(var|home)($|/)
 

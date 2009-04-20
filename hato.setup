@@ -1,0 +1,15 @@
+
+(compile -s -O3 -d0 -j let-args let-args.scm)
+(compile -s -O2 -d0 let-args.import.scm)
+(install-extension
+ 'let-args
+ '("let-args.so" "let-args.import.so")
+ '((version 0.306)))
+
+(compile -s -O3 -d0 -j hato-base64 hato-base64.scm)
+(compile -s -O2 -d0 hato-base64.import.scm)
+(install-extension
+ 'hato-base64
+ '("hato-base64.so" "hato-base64.import.so")
+ '((version 0.306)))
+

@@ -1,55 +1,102 @@
 ;; hato-log.scm -- Apache-style logging levels
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-;; (cond-expand
-;;  ((and chicken compiling)
-;;   (declare
-;;    (export
-;;     current-log-level
-;;     log-open log-close log-display log-format
-;;     log-emergency log-alert log-critical log-error
-;;     log-warn log-notice log-info log-debug)))
-;;  (else))
+(require-library posix)
+
+(module hato-log
+  (define-logger log-open log-close log-display log-format
+   log-error-message log-call-chain log-error&call-chain)
+
+(import scheme chicken extras data-structures ports posix)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define current-log-level 6)  ; default to info
 (define current-log-port (current-error-port))
 (define current-log-file #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (define-logger logger level)
-  (let* ((t (symbol->string logger))
-         (type (if (and (> (string-length t) 4)
-                        (string=? "log-" (substring t 0 4)))
-                   (substring t 4)
-                   t)))
-    `(define-macro (,logger fmt . o)
-       `(if (>= current-log-level ,,level)
-            (log-format ',,type ,fmt ,@o)))))
+(define-syntax define-logger
+  (er-macro-transformer
+   (lambda (expr r c)
+     (let* ((level-info (cadr expr))
+            (loggers
+             (let lp ((ls (caddr expr))
+                      (i 0)
+                      (res '()))
+               (cond ((null? ls)
+                      (reverse res))
+                     ((pair? (car ls))
+                      (if (<= (cadar ls) i)
+                          (error "log levels must be increasing" (caddr expr))
+                          (lp (cdr ls) (+ (cadar ls) 1) (cons (car ls) res))))
+                     (else
+                      (lp (cdr ls) (+ i 1) (cons (list (car ls) i) res))))))
+            (log-descriptions
+             (map (lambda (x)
+                    (cons
+                     (string->symbol
+                      (if (pair? (cddr x))
+                          (caddr x)
+                          (let ((desc (symbol->string (car x))))
+                            (if (and (> (string-length desc) 4)
+                                     (string=? "log-" (substring desc 0 4)))
+                                (substring desc 4)
+                                desc))))
+                     (cadr x)))
+                  loggers))
+            (level-getter (car level-info))
+            (level-setter (cadr level-info))
+            (default-level (if (pair? (cddr level-info))
+                               (caddr level-info)
+                               (cadr (car (reverse loggers)))))
+            (level-var (r '*log-level*))
+            (level-indexer (r 'x->level))
+            (_define (r 'define))
+            (x (r 'x)))
+       `(,(r 'begin)
+         (,_define (,level-indexer ,x)
+                   (,(r 'cond)
+                    ((,(r 'assq) ,x ',log-descriptions)
+                     ,(r '=>) ,(r 'cdr))
+                    ((,(r 'integer?) ,x) ,x)
+                    (,(r 'else) (,(r' error) "invalid log level" ,x))))
+         (,_define ,level-var
+                   (,(r 'cons) (,level-indexer ',default-level) '()))
+         (,_define (,level-getter) (,(r 'car) ,level-var))
+         (,_define (,level-setter ,x)
+                   (,(r 'set-car!) ,level-var (,level-indexer ,x)))
+         ,@(map
+            (lambda (logger description)
+              (let ((name (car logger))
+                    (level (cadr logger)))
+                `(,(r 'define-syntax) ,name
+                  (,(r 'er-macro-transformer)
+                   (,(r 'lambda) (,x ,(r 'r2) ,(r 'c2))
+                    (,(r 'quasiquote)
+                     ((,(r 'unquote) (,(r 'r2) 'if))
+                      ((,(r 'unquote) (,(r 'r2) '>=))
+                       (,(r 'car) ,level-var)
+                       ,level)
+                      ((,(r 'unquote) (,(r 'r2) 'log-format))
+                       ,(symbol->string (car description))
+                       (,(r 'unquote-splicing) (,(r 'cdr) ,x))))))))))
+            loggers
+            log-descriptions))))))
 
-;;             Level          Example
-;;             -----          -------
-(define-logger log-emergency 0) ; the server is on fire!!!
-(define-logger log-alert     1) ; couldn't write to user mailbox
-(define-logger log-critical  2) ; couldn't run 'dig' executable
-(define-logger log-error     3) ; error loading user filter
-(define-logger log-warn      4) ; invalid smtp command; relay failed
-(define-logger log-notice    5) ; saved to file/relayed to address
-(define-logger log-info      6) ; loaded alias file
-(define-logger log-debug     7) ; spam-probability: 0.5
+;;(define-constant *week-day-abbrevs*
+;;  (vector "Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat"))
 
-(define-constant *week-day-abbrevs*
-  (vector "Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat"))
+;;(define (week-day-abbrev i)
+;;  (if (<= 0 i 6) (vector-ref *week-day-abbrevs* i) "___"))
 
 (define (current-log-date-string)
   (define (pad0 n len)
-    (string-pad (number->string n) len #\0))
-  (define (week-day-abbrev i)
-    (if (<= 0 i 6) (vector-ref *week-day-abbrevs* i) "___"))
+    (let* ((s (number->string n))
+           (diff (- len (string-length s))))
+      (if (> diff 0) (string-append s (make-string diff #\0)) s)))
   (let ((now (seconds->local-time (current-seconds))))
     ;; this makes lexicographic sort == chronological sort
     (sprintf "~A-~A-~A ~A:~A:~A"
@@ -107,9 +154,9 @@
   (if (output-port? current-log-port)
       (close-output-port current-log-port)))
 
-(define (log-error-message exn)
-  (log-error "~A" (call-with-output-string
-                    (lambda (out) (print-error-message exn out "")))))
+(define (log-error-message type exn)
+  (log-format type "~A" (call-with-output-string
+                         (lambda (out) (print-error-message exn out "")))))
 
 (define (log-call-chain . o)
   (let ((call-chain (if (pair? o) (car o) (get-call-chain 1 #t))))
@@ -126,8 +173,10 @@
          (newline current-log-port)))
      call-chain)))
 
-(define (log-error&call-chain exn)
+(define (log-error&call-chain type exn)
   (let ((call-chain (get-call-chain 1 #t)))
-    (log-error-message exn)
+    (log-error-message type exn)
     (log-call-chain call-chain)))
+
+)
 

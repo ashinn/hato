@@ -1,34 +1,22 @@
 ;;;; let-args.scm -- friendly syntax for command-line arguments
 ;;
-;; Copyright (c) 2003-2007 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2003-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-(eval-when (compile eval)
+(use srfi-1)
 
-(define (proper-list? ls)
-  (cond ((pair? ls) (proper-list? (cdr ls)))
-        ((null? ls) #t)
-        (else #f)))
+(module let-args (let-args)
 
-(define (split-improper-list ls)
+(import scheme chicken data-structures)
+(import-for-syntax srfi-1)
+
+(define-for-syntax (split-improper-list ls)
   (let loop ((l ls) (res '()))
     (if (pair? l)
       (loop (cdr l) (cons (car l) res))
       (values (reverse res) l))))
 
-(define (filter pred ls)
-  (let lp ((ls ls) (res '()))
-    (if (null? ls)
-      (reverse res)
-      (lp (cdr ls) (if (pred (car ls)) (cons (car ls) res) res)))))
-
-(define (span pred ls)
-  (let lp ((ls ls) (left '()))
-    (if (or (null? ls) (not (pred (car ls))))
-      (values (reverse left) ls)
-      (lp (cdr ls) (cons (car ls) left)))))
-
-(define (type-coercer+next type)
+(define-for-syntax (type-coercer+next type)
   (cond
     ((or (not type) (equal? type ""))
      (values #f #f))
@@ -67,7 +55,7 @@
        (else (error "unknown type: " type))))))
 
 ;; normalize: var keywords default action doc
-(define (extract-spec x ls kont)
+(define-for-syntax (extract-spec x ls kont)
   (cond
     ((symbol? x)
      (extract-spec (list x) ls kont))
@@ -107,20 +95,20 @@
                 doc)))))))
     (else (error "bad binding in let-args:" x))))
 
-(define (spec-var x) (vector-ref x 0))
-(define (spec-keywords x) (vector-ref x 1))
-(define (spec-default x) (vector-ref x 2))
-(define (spec-action x) (vector-ref x 3))
-(define (spec-doc x) (vector-ref x 4))
+(define-for-syntax (spec-var x) (vector-ref x 0))
+(define-for-syntax (spec-keywords x) (vector-ref x 1))
+(define-for-syntax (spec-default x) (vector-ref x 2))
+(define-for-syntax (spec-action x) (vector-ref x 3))
+(define-for-syntax (spec-doc x) (vector-ref x 4))
 
-(define (spec-eval-default? x)
+(define-for-syntax (spec-eval-default? x)
   (or (symbol? (spec-default x))
       (and (pair? (spec-default x))
            (not (eq? 'quote (car (spec-default x)))))))
-(define (spec-literal-default? x)
+(define-for-syntax (spec-literal-default? x)
   (not (spec-eval-default? x)))
 
-(define (build-let-args init-ls vars rest-var body)
+(define-for-syntax (build-let-args init-ls vars rest-var body)
   (let ((rest-var (or rest-var (gensym 'rest)))
         (loop (gensym 'loop))
         (ls (gensym 'ls))
@@ -163,7 +151,10 @@
                                    (unless (= ,i ,len)
                                      (if (eq? #\= (string-ref ,str ,i))
                                          (begin
-                                           (set! ,ls (cons (car ,ls) (cons (substring ,str (+ ,i 1)) (cdr ,ls))))
+                                           (set! ,ls
+                                                 (cons (car ,ls)
+                                                       (cons (substring ,str (+ ,i 1))
+                                                             (cdr ,ls))))
                                            (set! ,str (substring ,str 0 ,i)))
                                          (,loop (+ ,i 1)))))
                               (case (string->symbol
@@ -180,10 +171,15 @@
                                         ,str (cdr ,ls) ,loop)
                                       `(,finish (cdr ,ls))))))))))))))))
 
-)
+(define-syntax let-args
+  (er-macro-transformer
+   (lambda (expr rename compare)
+     (apply
+      (lambda (ls vars . body)
+        (if (proper-list? vars)
+            (build-let-args ls vars #f body)
+            (receive (vars rest-var) (split-improper-list vars)
+              (build-let-args ls vars rest-var body))))
+      (cdr expr)))))
 
-(define-macro (let-args ls vars . body)
-  (if (proper-list? vars)
-    (build-let-args ls vars #f body)
-    (receive (vars rest-var) (split-improper-list vars)
-      (build-let-args ls vars rest-var body))))
+)

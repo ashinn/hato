@@ -1,6 +1,6 @@
 ;;;; hato-nntp.scm -- nntp client library
 ;;
-;; Copyright (c) 2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2008-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

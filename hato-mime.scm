@@ -1,6 +1,6 @@
 ;;;; hato-mime.scm -- RFC2045 MIME library
 ;;
-;; Copyright (c) 2005 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -65,32 +65,23 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (fixnum)
-   (export mime-ref assoc-ref
-           mime-header-fold mime-headers->list
-           mime-parse-content-type mime-decode-header
-           mime-message-fold)))
- (else))
+(module hato-mime
+  (mime-ref assoc-ref mime-header-fold mime-headers->list
+   mime-parse-content-type mime-decode-header
+   mime-message-fold)
 
-(cond-expand
- (static
-  (include "hato-base64.scm")
-  (include "quoted-printable.scm")
-  (define (ces-convert str . o) str))
- (else
-  (require-extension hato-base64 quoted-printable charconv)))
+(import scheme chicken extras hato-base64 quoted-printable charconv)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; warn on invalid headers in debug mode
 
 (cond-expand
  (debug
-  (define-macro (warn . o) `(fprintf (current-error-port) ,@o) #t))
+  (define-syntax warn
+    (syntax-rules ()
+      ((warn args ...) (begin (fprintf (current-error-port) args ...) #t)))))
  (else
-  (define-macro (warn . o) #t)))
+  (define-syntax warn (syntax-rules () ((warn args ...) #t)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; association lists
@@ -357,3 +348,5 @@
   (mime-message-fold
    (if (pair? o) (car o) (current-input-port))
    (lambda (parent-headers headers body seed) (cons body seed))))
+
+)

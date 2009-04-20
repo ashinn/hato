@@ -1,19 +1,17 @@
 ;; dns.scm -- Domain Name Service library
 ;;
-;; Copyright (c) 2005 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; Currently we just call out to dig, which is simple and fast enough.
 ;; The in-progress UDP-based interface is commented out below.
 
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (export dns-query dns-response dns-lookup dns-text dns-mx)))
- (else))
+(module dns
+ (dns-query dns-response dns-lookup dns-text dns-mx)
 
-;(require-extension udp lolevel srfi-4)
-(require-extension posix)
+(import scheme chicken posix)
+
+;(use udp lolevel srfi-4)
 
 (define (escape-non-alpha-numeric+list str ls)
   (list->string
@@ -269,3 +267,5 @@
 
 ; (define (dns-mx hostname)
 ;   #f)
+
+ )

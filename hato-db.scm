@@ -1,23 +1,17 @@
 ;; hato-db.scm -- simple string->object database
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-(use gdbm lolevel)
+(require-library tokyocabinet)
 
-(cond-expand
- ((and chicken compiling)
-  (declare
-   (export db? db-file? open-db close-db db-ref db-set! db-delete!)))
- (else))
+(module hato-db
+  (db? db-file? open-db close-db db-ref db-set! db-delete!)
+
+(import scheme chicken tokyocabinet)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Primarily for white-lists and message-id databases.
-
-;; Uses GDBM - we could default to a file-based solution when GDBM
-;; is absent, but then have to detect and understand both types at
-;; run-time in case they later install GDBM.  Need to finish my own
-;; extensible hash-tables.
 
 (define (db-file? file)
   (define (ascii? c)
@@ -33,16 +27,17 @@
 
 (define db? pointer?)
 (define (open-db file . o)
-  (apply gdbm-open file o))
+  (apply tc-hdb-open file o))
 (define (close-db db)
-  (gdbm-close db))
+  (tc-hdb-close db))
 (define (db-ref db key . o)
-  (let ((s (gdbm-fetch db key)))
+  (let ((s (tc-hdb-get db key)))
     (if s
-      (call-with-input-string s read)
-      (and (pair? o) (car o)))))
+        (call-with-input-string s read)
+        (and (pair? o) (car o)))))
 (define (db-set! db key val)
-  (gdbm-store db key (with-output-to-string (cut write val))))
+  (tc-hdb-put! db key (with-output-to-string (cut write val))))
 (define (db-delete! db key)
-  (gdbm-delete db key))
+  (tc-hdb-delete! db key))
 
+)

@@ -1,16 +1,16 @@
 ;; hato-daemon.scm -- utility to run a daemon
 ;;
-;; Copyright (c) 2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2008-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (use extras posix regex tcp tcp-server)
 
-(cond-expand
- ((and chicken compiling)
-  (declare (export running-process-id? daemonize daemon-kill)))
- (else))
+(module hato-daemon
+  (running-process-id? daemonize daemon-kill)
+
+(import scheme chicken extras posix regex tcp tcp-server)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -160,7 +160,6 @@
               (error "couldn't bind to port" tcp-port)
               (error "tcp-handler requires a tcp-port argument"))))
      ;; just return the listener if a handler isn't specified
-     (listener))
+     (listener))))
 
-    ))
-
+)

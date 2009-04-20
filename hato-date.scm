@@ -1,18 +1,17 @@
 ;;;; hato-date.scm -- time and date utilities
 ;;
-;; Copyright (c) 2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2008-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use regex regex-case posix srfi-13)
+(require-library regex-case)
 
-(cond-expand
- ((and chicken compiling)
-  (declare
-   (export parse-date wday->number mon->number
-           date<=? date>=? date=? time<=? time>=? time=?)))
- (else))
+(module hato-date
+  (parse-date wday->number mon->number
+   date<=? date>=? date=? time<=? time>=? time=?)
+
+(import scheme chicken extras regex posix srfi-13 regex-case)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -237,3 +236,5 @@
   (let ((res (epoch-seconds->utc-time-vector (- secs tz-offset))))
     (vector-set! res 9 tz-offset)
     res))
+
+)

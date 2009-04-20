@@ -1,6 +1,6 @@
 ;;;; hato-imap.scm -- imap client library
 ;;
-;; Copyright (c) 2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2008-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -21,25 +21,26 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use autoload tcp extras srfi-1 srfi-13 srfi-18 posix)
-(autoload openssl ssl-connect)
+(require-library autoload tcp srfi-1 srfi-13 srfi-18)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cond-expand
- ((and chicken compiling)
-  (declare
-   (export imap-connect imap-connect-ssl imap-disconnect imap-open
-           imap? imap-exists imap-flags imap-resp imap-recent
-           imap-login imap-logout imap-send imap-get-response
-           imap-select imap-examine imap-status imap-delete
-           imap-rename imap-subscribe imap-status->alist
-           imap-unsubscribe imap-list imap-lsub imap-append
-           imap-check imap-close imap-expunge imap-search imap-search/uid
-           imap-fetch imap-fetch/uid imap-fetch-fold imap-fetch-fold/uid
-           imap-fetch-one-body imap-fetch-one-body/uid
-           imap-store imap-store/uid imap-copy imap-copy/uid)))
- (else))
+(module hato-imap
+  (
+   imap-connect imap-connect-ssl imap-disconnect imap-open
+   imap? imap-exists imap-flags imap-resp imap-recent
+   imap-login imap-logout imap-send imap-get-response
+   imap-select imap-examine imap-status imap-delete
+   imap-rename imap-subscribe imap-status->alist
+   imap-unsubscribe imap-list imap-lsub imap-append
+   imap-check imap-close imap-expunge imap-search imap-search/uid
+   imap-fetch imap-fetch/uid imap-fetch-fold imap-fetch-fold/uid
+   imap-fetch-one-body imap-fetch-one-body/uid
+   imap-store imap-store/uid imap-copy imap-copy/uid)
+
+(import scheme chicken extras srfi-1 srfi-13 srfi-18 posix tcp autoload)
+
+(autoload openssl ssl-connect)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; imap data structure
@@ -881,3 +882,4 @@
         #f
         (imap-send-simple imap 'UID 'COPY set mbox))))
 
+)

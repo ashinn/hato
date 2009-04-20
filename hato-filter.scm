@@ -1,27 +1,24 @@
 ;;;; hato-filter.scm -- user-level mail filters
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(module hato-filter
+ (mail? make-mail
+  mail-text set-mail-text!
+  mail-headers set-mail-headers!
+  mail-stats set-mail-stats!
+  hato-user-env
+  hato-user-env-definitions
+  hato-sys-env-definitions
+  )
+
+(import scheme chicken)
+
 (use user-env hato-prob hato-archive hato-db hato-mime hato-smtp
      domain-keys srfi-1 srfi-13 posix regex sandbox)
-
-(cond-expand
- ((and chicken compiling)
-  (declare
-   (export
-    mail? make-mail
-    mail-text set-mail-text!
-    mail-headers set-mail-headers!
-    mail-stats set-mail-stats!
-    hato-user-env
-    hato-user-env-definitions
-    hato-sys-env-definitions
-    )))
- (else
-  ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -260,4 +257,4 @@
     (safe-environment-remove! e '%open-db)
     e))
 
-
+)

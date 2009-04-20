@@ -1,23 +1,20 @@
 ;; hato-config.scm -- loading and referencing config files
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use srfi-1 srfi-13 extras utils posix hato-db)
+(require-library srfi-1 srfi-13 hato-db)
 
-(cond-expand
- ((and chicken compiling)
-  (declare
-   (export
-    assq-ref read-from-file alist? conf?
-    conf-load conf-load-in-path conf-load-cascaded
-    conf-get conf-get-list conf-get-alist
-    conf-multi conf-extend conf-verify
-    conf-load-table
-    )))
- (else))
+(module hato-config
+ (assq-ref read-from-file alist? conf?
+  conf-load conf-load-in-path conf-load-cascaded
+  conf-get conf-get-list conf-get-alist
+  conf-multi conf-extend conf-verify
+  conf-load-table)
+
+(import scheme chicken srfi-1 srfi-13 extras utils posix hato-db)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Config lists (cascaded lists of alists)
@@ -274,3 +271,4 @@
                          (car cell) def (cell-value)))
           #f)))))
 
+ )
