@@ -3,33 +3,17 @@
 ;; Copyright (c) 2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-(require-library numbers)
-
 (module hato-md5
-  (md5-digest)
+  (md5-digest md5-digest-file)
 
-(import (except scheme + - * / = > < >= <= number->string string->number
-                eqv? equal? exp log sin cos tan atan acos asin expt sqrt
-                quotient modulo remainder numerator denominator abs max min
-                gcd lcm positive? negative? zero? odd? even? exact? inexact?
-                floor ceiling truncate round inexact->exact exact->inexact
-                number? complex? real? rational? integer? real-part imag-part
-                magnitude)
-        chicken extras numbers)
-
-(define (u32 a) (bitwise-and a #xFFFFFFFF))
-(define (u32+ a b) (u32 (+ a b)))
-(define (u32<<< n s)
-  (bitwise-ior (arithmetic-shift n s) (arithmetic-shift n (- s 32))))
+(import scheme chicken extras)
 
 (define (extract-byte n i)
   (bitwise-and #xFF (arithmetic-shift n (* i -8))))
 
-(define (string-u32-ref str i)
+(define (string-u16-ref str i)
   (+ (char->integer (string-ref str i))
-     (arithmetic-shift (char->integer (string-ref str (+ i 1))) 8)
-     (arithmetic-shift (char->integer (string-ref str (+ i 2))) 16)
-     (arithmetic-shift (char->integer (string-ref str (+ i 3))) 24)))
+     (arithmetic-shift (char->integer (string-ref str (+ i 1))) 8)))
 
 (define (string-byte-set! str i n)
   (string-set! str i (integer->char n)))
@@ -39,10 +23,8 @@
       (string-append "0" (number->string n 16))
       (number->string n 16)))
 
-(define (number->u32-string n)
-  (string-append
-   (hex (extract-byte n 0)) (hex (extract-byte n 1))
-   (hex (extract-byte n 2)) (hex (extract-byte n 3))))
+(define (number->u16-string n)
+  (string-append (hex (extract-byte n 0)) (hex (extract-byte n 1))))
 
 ;; 3. MD5 Algorithm Description
 
@@ -107,21 +89,27 @@
 ;;           H(X,Y,Z) = X xor Y xor Z
 ;;           I(X,Y,Z) = Y xor (X v not(Z))
 
-(define (FF X Y Z)
-  (bitwise-ior (bitwise-and X Y) (bitwise-and (bitwise-not X) Z)))
-(define (GG X Y Z)
-  (bitwise-ior (bitwise-and X Z) (bitwise-and Y (bitwise-not Z))))
-(define (HH X Y Z)
-  (bitwise-xor X Y Z))
-(define (II X Y Z)
-  (bitwise-xor Y (bitwise-ior X (bitwise-not Z))))
+;; (define T
+;;   (do ((i 64 (- i 1))
+;;        (ls '()
+;;            (cons (u32 (inexact->exact (truncate (* 4294967296 (abs (sin i))))))
+;;                  ls)))
+;;       ((< i 0) (list->vector ls))))
 
 (define T
-  (do ((i 64 (- i 1))
-       (ls '()
-           (cons (u32 (inexact->exact (truncate (* 4294967296 (abs (sin i))))))
-                 ls)))
-      ((< i 0) (list->vector ls))))
+  '#(0     0       #xd76a #xa478 #xe8c7 #xb756 #x2420 #x70db #xc1bd #xceee
+     #xf57c #x0faf #x4787 #xc62a #xa830 #x4613 #xfd46 #x9501 #x6980 #x98d8
+     #x8b44 #xf7af #xffff #x5bb1 #x895c #xd7be #x6b90 #x1122 #xfd98 #x7193
+     #xa679 #x438e #x49b4 #x0821 #xf61e #x2562 #xc040 #xb340 #x265e #x5a51
+     #xe9b6 #xc7aa #xd62f #x105d #x0244 #x1453 #xd8a1 #xe681 #xe7d3 #xfbc8
+     #x21e1 #xcde6 #xc337 #x07d6 #xf4d5 #x0d87 #x455a #x14ed #xa9e3 #xe905
+     #xfcef #xa3f8 #x676f #x02d9 #x8d2a #x4c8a #xfffa #x3942 #x8771 #xf681
+     #x6d9d #x6122 #xfde5 #x380c #xa4be #xea44 #x4bde #xcfa9 #xf6bb #x4b60
+     #xbebf #xbc70 #x289b #x7ec6 #xeaa1 #x27fa #xd4ef #x3085 #x0488 #x1d05
+     #xd9d4 #xd039 #xe6db #x99e5 #x1fa2 #x7cf8 #xc4ac #x5665 #xf429 #x2244
+     #x432a #xff97 #xab94 #x23a7 #xfc93 #xa039 #x655b #x59c3 #x8f0c #xcc92
+     #xffef #xf47d #x8584 #x5dd1 #x6fa8 #x7e4f #xfe2c #xe6e0 #xa301 #x4314
+     #x4e08 #x11a1 #xf753 #x7e82 #xbd3a #xf235 #x2ad7 #xd2bb #xeb86 #xd391))
 
 ;;    In each bit position F acts as a conditional: if X then Y else Z.
 ;;    The function F could have been defined using + instead of v since XY
@@ -146,11 +134,11 @@
 (define (md5-digest src)
   (let ((in (if (string? src) (open-input-string src) src))
         (buf (make-string 64))
-        (vec (make-vector 16))
-        (A #x67452301)
-        (B #xefcdab89)
-        (C #x98badcfe)
-        (D #x10325476))
+        (vec (make-vector 32))
+        (A1 #x6745) (A0 #x2301)
+        (B1 #xefcd) (B0 #xab89)
+        (C1 #x98ba) (C0 #xdcfe)
+        (D1 #x1032) (D0 #x5476))
     ;; Process each 16-word block.
     (let lp ((i 0) (pad (integer->char #x80)))
       (let ((n (read-string! 64 buf in)))
@@ -166,86 +154,197 @@
               (string-byte-set! buf 57 (extract-byte len 1))
               (string-byte-set! buf 58 (extract-byte len 2))
               (string-byte-set! buf 59 (extract-byte len 3))
-              (string-byte-set! buf 60 (extract-byte len 4))
-              (string-byte-set! buf 61 (extract-byte len 5))
-              (string-byte-set! buf 62 (extract-byte len 6))
-              (string-byte-set! buf 63 (extract-byte len 7)))))))
+              ;;(string-byte-set! buf 60 (extract-byte len 4))
+              ;;(string-byte-set! buf 61 (extract-byte len 5))
+              ;;(string-byte-set! buf 62 (extract-byte len 6))
+              ;;(string-byte-set! buf 63 (extract-byte len 7))
+              )))))
         ;; Copy block i into X.
         (do ((j 0 (+ j 1)))
             ((= j 16))
-          (vector-set! vec j (string-u32-ref buf (* j 4))))
+          (vector-set! vec (* j 2) (string-u16-ref buf (* j 4)))
+          (vector-set! vec (+ (* j 2) 1) (string-u16-ref buf (+ (* j 4) 2))))
         ;; Save A as AA, B as BB, C as CC, and D as DD.
-        (let ((AA A)
-              (BB B)
-              (CC C)
-              (DD D))
+        (let ((AA0 A0) (AA1 A1)
+              (BB0 B0) (BB1 B1)
+              (CC0 C0) (CC1 C1)
+              (DD0 D0) (DD1 D1)
+              (T1 0)   (T0 0))
           (letrec-syntax
-              ((R
+              ((add
                 (syntax-rules ()
-                  ((R op a b c d k s i)
-                   (set! a (u32+ b (u32<<< (u32+ (u32+ a (op b c d))
-                                                 (u32+ (vector-ref vec k)
-                                                       (vector-ref T i)))
-                                           s))))))
-               (R1 (syntax-rules () ((R1 a b c d k s i) (R FF a b c d k s i))))
-               (R2 (syntax-rules () ((R2 a b c d k s i) (R GG a b c d k s i))))
-               (R3 (syntax-rules () ((R3 a b c d k s i) (R HH a b c d k s i))))
-               (R4 (syntax-rules () ((R4 a b c d k s i) (R II a b c d k s i)))))
+                  ((add d1 d0 a1 a0 b1 b0)
+                   (begin
+                     (set! d0 (+ a0 b0))
+                     (set! d1 (bitwise-and
+                               (+ a1 b1 (arithmetic-shift d0 -16))
+                               #xFFFF))
+                     (set! d0 (bitwise-and d0 #xFFFF))))))
+               (rot
+                (syntax-rules ()
+                  ((rot d1 d0 a1 a0 s)
+                   (let ((tmp a1))
+                     (set! d1 (bitwise-and
+                               (bitwise-ior (arithmetic-shift a1 s)
+                                            (arithmetic-shift a1 (- s 32))
+                                            (arithmetic-shift a0 (- s 16)))
+                               #xFFFF))
+                     (set! d0 (bitwise-and
+                               (bitwise-ior (arithmetic-shift a0 s)
+                                            (arithmetic-shift a0 (- s 32))
+                                            (arithmetic-shift tmp (- s 16)))
+                               #xFFFF))))))
+               (bit-not
+                (syntax-rules ()
+                  ((bit-not a) (- (expt 2 16) a 1))))
+               (FF
+                (syntax-rules ()
+                  ((FF d1 d0 x1 x0 y1 y0 z1 z0)
+                   (begin
+                     (set! d1 (bitwise-ior (bitwise-and x1 y1)
+                                           (bitwise-and (bit-not x1) z1)))
+                     (set! d0 (bitwise-ior (bitwise-and x0 y0)
+                                           (bitwise-and (bit-not x0) z0)))
+                     ))))
+               (GG
+                (syntax-rules ()
+                  ((GG d1 d0 x1 x0 y1 y0 z1 z0)
+                   (begin
+                     (set! d1 (bitwise-ior (bitwise-and x1 z1)
+                                           (bitwise-and y1 (bit-not z1))))
+                     (set! d0 (bitwise-ior (bitwise-and x0 z0)
+                                           (bitwise-and y0 (bit-not z0))))
+                     ))))
+               (HH
+                (syntax-rules ()
+                  ((HH d1 d0 x1 x0 y1 y0 z1 z0)
+                   (begin (set! d1 (bitwise-xor x1 y1 z1))
+                          (set! d0 (bitwise-xor x0 y0 z0))))))
+               (II
+                (syntax-rules ()
+                  ((II d1 d0 x1 x0 y1 y0 z1 z0)
+                   (begin
+                     (set! d1 (bitwise-xor y1 (bitwise-ior x1 (bit-not z1))))
+                     (set! d0 (bitwise-xor y0 (bitwise-ior x0 (bit-not z0))))
+                     ))))
+               (R
+                (syntax-rules ()
+                  ((R op T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i)
+                   (begin
+                     (op T1 T0 b1 b0 c1 c0 d1 d0)
+                     (add T1 T0 T1 T0
+                          (vector-ref vec (+ (* k 2) 1))
+                          (vector-ref vec (* k 2)))
+                     (add T1 T0 T1 T0
+                          (vector-ref T (* i 2))
+                          (vector-ref T (+ (* i 2) 1)))
+                     (add a1 a0 a1 a0 T1 T0)
+                     (rot a1 a0 a1 a0 s)
+                     (add a1 a0 a1 a0 b1 b0)))))
+               (R1 (syntax-rules ()
+                     ((R1 T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i)
+                      (R FF T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i))))
+               (R2 (syntax-rules ()
+                     ((R2 T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i)
+                      (R GG T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i))))
+               (R3 (syntax-rules ()
+                     ((R3 T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i)
+                      (R HH T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i))))
+               (R4 (syntax-rules ()
+                     ((R4 T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i)
+                      (R II T1 T0 a1 a0 b1 b0 c1 c0 d1 d0 vec k s i)))))
             ;; Round 1: Let [abcd k s i] denote the operation
             ;;   a = b + ((a + F(b,c,d) + X[k] + T[i]) <<< s)
-            (R1 A B C D 0 7 1)     (R1 D A B C 1 12 2)
-            (R1 C D A B 2 17 3)    (R1 B C D A 3 22 4)
-            (R1 A B C D 4 7 5)     (R1 D A B C 5 12 6)
-            (R1 C D A B 6 17 7)    (R1 B C D A 7 22 8)
-            (R1 A B C D 8 7 9)     (R1 D A B C 9 12 10)
-            (R1 C D A B 10 17 11)  (R1 B C D A 11 22 12)
-            (R1 A B C D 12 7 13)   (R1 D A B C 13 12 14)
-            (R1 C D A B 14 17 15)  (R1 B C D A 15 22 16)
+            (R1 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 0 7 1)
+            (R1 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 1 12 2)
+            (R1 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 2 17 3)
+            (R1 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 3 22 4)
+            (R1 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 4 7 5)
+            (R1 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 5 12 6)
+            (R1 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 6 17 7)
+            (R1 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 7 22 8)
+            (R1 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 8 7 9)
+            (R1 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 9 12 10)
+            (R1 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 10 17 11)
+            (R1 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 11 22 12)
+            (R1 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 12 7 13)
+            (R1 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 13 12 14)
+            (R1 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 14 17 15)
+            (R1 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 15 22 16)
             ;; Round 2: Let [abcd k s i] denote the operation
             ;;   a = b + ((a + G(b,c,d) + X[k] + T[i]) <<< s)
-            (R2 A B C D 1 5 17)    (R2 D A B C 6 9 18)
-            (R2 C D A B 11 14 19)  (R2 B C D A 0 20 20)
-            (R2 A B C D 5 5 21)    (R2 D A B C 10 9 22)
-            (R2 C D A B 15 14 23)  (R2 B C D A 4 20 24)
-            (R2 A B C D 9 5 25)    (R2 D A B C 14 9 26)
-            (R2 C D A B 3 14 27)   (R2 B C D A 8 20 28)
-            (R2 A B C D 13 5 29)   (R2 D A B C 2 9 30)
-            (R2 C D A B 7 14 31)   (R2 B C D A 12 20 32)
+            (R2 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 1 5 17)
+            (R2 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 6 9 18)
+            (R2 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 11 14 19)
+            (R2 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 0 20 20)
+            (R2 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 5 5 21)
+            (R2 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 10 9 22)
+            (R2 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 15 14 23)
+            (R2 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 4 20 24)
+            (R2 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 9 5 25)
+            (R2 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 14 9 26)
+            (R2 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 3 14 27)
+            (R2 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 8 20 28)
+            (R2 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 13 5 29)
+            (R2 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 2 9 30)
+            (R2 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 7 14 31)
+            (R2 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 12 20 32)
             ;; Round 3: Let [abcd k s i] denote the operation
             ;;   a = b + ((a + H(b,c,d) + X[k] + T[i]) <<< s)
-            (R3 A B C D 5 4 33)    (R3 D A B C 8 11 34)
-            (R3 C D A B 11 16 35)  (R3 B C D A 14 23 36)
-            (R3 A B C D 1 4 37)    (R3 D A B C 4 11 38)
-            (R3 C D A B 7 16 39)   (R3 B C D A 10 23 40)
-            (R3 A B C D 13 4 41)   (R3 D A B C 0 11 42)
-            (R3 C D A B 3 16 43)   (R3 B C D A 6 23 44)
-            (R3 A B C D 9 4 45)    (R3 D A B C 12 11 46)
-            (R3 C D A B 15 16 47)  (R3 B C D A 2 23 48)
+            (R3 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 5 4 33)
+            (R3 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 8 11 34)
+            (R3 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 11 16 35)
+            (R3 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 14 23 36)
+            (R3 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 1 4 37)
+            (R3 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 4 11 38)
+            (R3 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 7 16 39)
+            (R3 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 10 23 40)
+            (R3 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 13 4 41)
+            (R3 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 0 11 42)
+            (R3 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 3 16 43)
+            (R3 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 6 23 44)
+            (R3 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 9 4 45)
+            (R3 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 12 11 46)
+            (R3 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 15 16 47)
+            (R3 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 2 23 48)
             ;; Round 4: Let [abcd k s i] denote the operation
             ;;   a = b + ((a + I(b,c,d) + X[k] + T[i]) <<< s)
-            (R4 A B C D 0 6 49)    (R4 D A B C 7 10 50)
-            (R4 C D A B 14 15 51)  (R4 B C D A 5 21 52)
-            (R4 A B C D 12 6 53)   (R4 D A B C 3 10 54)
-            (R4 C D A B 10 15 55)  (R4 B C D A 1 21 56)
-            (R4 A B C D 8 6 57)    (R4 D A B C 15 10 58)
-            (R4 C D A B 6 15 59)   (R4 B C D A 13 21 60)
-            (R4 A B C D 4 6 61)    (R4 D A B C 11 10 62)
-            (R4 C D A B 2 15 63)   (R4 B C D A 9 21 64)
+            (R4 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 0 6 49)
+            (R4 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 7 10 50)
+            (R4 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 14 15 51)
+            (R4 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 5 21 52)
+            (R4 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 12 6 53)
+            (R4 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 3 10 54)
+            (R4 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 10 15 55)
+            (R4 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 1 21 56)
+            (R4 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 8 6 57)
+            (R4 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 15 10 58)
+            (R4 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 6 15 59)
+            (R4 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 13 21 60)
+            (R4 T1 T0 A1 A0 B1 B0 C1 C0 D1 D0 vec 4 6 61)
+            (R4 T1 T0 D1 D0 A1 A0 B1 B0 C1 C0 vec 11 10 62)
+            (R4 T1 T0 C1 C0 D1 D0 A1 A0 B1 B0 vec 2 15 63)
+            (R4 T1 T0 B1 B0 C1 C0 D1 D0 A1 A0 vec 9 21 64)
             ;; Then in increment each of the four registers by the
             ;; value it had before this block was started.
-            (set! A (u32+ A AA))
-            (set! B (u32+ B BB))
-            (set! C (u32+ C CC))
-            (set! D (u32+ D DD))
+            (add A1 A0 A1 A0 AA1 AA0)
+            (add B1 B0 B1 B0 BB1 BB0)
+            (add C1 C0 C1 C0 CC1 CC0)
+            (add D1 D0 D1 D0 DD1 DD0)
             (cond
              ((< n 64)
               (if (>= n 56)
                   (lp (+ i n) (integer->char 0))
                   (string-append
-                   (number->u32-string A) (number->u32-string B)
-                   (number->u32-string C) (number->u32-string D))))
+                   (number->u16-string A0) (number->u16-string A1)
+                   (number->u16-string B0) (number->u16-string B1)
+                   (number->u16-string C0) (number->u16-string C1)
+                   (number->u16-string D0) (number->u16-string D1))))
              (else
               (lp (+ i 64) pad)))))))))
+
+(define (md5-digest-file file)
+  (call-with-input-file file md5-digest))
 
 ;; 3.5 Step 5. Output
 
@@ -257,4 +356,3 @@
 ;;    C is given in the appendix.
 
 )
-

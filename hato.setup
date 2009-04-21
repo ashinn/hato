@@ -1,15 +1,50 @@
 
-(compile -s -O3 -d0 -j let-args let-args.scm)
-(compile -s -O2 -d0 let-args.import.scm)
-(install-extension
- 'let-args
- '("let-args.so" "let-args.import.so")
- '((version 0.306)))
+(define version 0.400)
 
-(compile -s -O3 -d0 -j hato-base64 hato-base64.scm)
-(compile -s -O2 -d0 hato-base64.import.scm)
-(install-extension
- 'hato-base64
- '("hato-base64.so" "hato-base64.import.so")
- '((version 0.306)))
+(define-syntax compile-module
+  (er-macro-transformer
+   (lambda (expr rename compare)
+     (let* ((module (cadr expr))
+            (mod-str (symbol->string module))
+            (mod-src (string-append mod-str ".scm"))
+            (mod-import (string-append mod-str ".import.scm"))
+            (mod-so (string-append mod-str ".so"))
+            (mod-import-so (string-append mod-str ".import.so"))
+            (_begin (rename 'begin))
+            (_compile (rename 'compile))
+            (_install-extension (rename 'install-extension)))
+       `(,_begin
+         (,_compile -s -O2 -d0 -j ,module ,mod-src)
+         (,_compile -s -O2 -d0 ,mod-src)
+         (,_install-extension
+          ',module
+          '(,mod-so ,mod-import-so)
+          '((version ,version))))))))
+
+(compile-module dns)
+(compile-module domain-keys)
+(compile-module let-args)
+(compile-module lru-cache)
+(compile-module quoted-printable)
+(compile-module user-env)
+(compile-module hato-base64)
+(compile-module hato-uri)
+(compile-module hato-date)
+(compile-module hato-mime)
+(compile-module hato-archive)
+(compile-module hato-config)
+(compile-module hato-daemon)
+(compile-module hato-db)
+(compile-module hato-filter)
+(compile-module hato-i3db)
+(compile-module hato-imap)
+(compile-module hato-log)
+(compile-module hato-md5)
+(compile-module hato-nntp)
+(compile-module hato-pop)
+(compile-module hato-prob)
+(compile-module hato-rfc3028)
+(compile-module hato-smtp)
+(compile-module hato-spf)
+(compile-module hato-token)
 

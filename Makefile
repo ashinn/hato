@@ -28,22 +28,21 @@ all: modules hato-mta hato-classify hato-fetch
 modules: $(MODULES)
 
 %.so: %.scm
-	$(CSC) $(CHICKEN_OPTS) -s -emit-exports $(<:%.scm=%.exports) $< \
-	    2>&1 | ./filter-csc-warnings.scm
+	$(CSC) $(CHICKEN_OPTS) -s $< 2>&1
 
 ########################################################################
 
 hato-mta: hato-mta.scm let-args.scm
-	$(CSC) $(CHICKEN_OPTS) -o $@ $< 2>&1 | ./filter-csc-warnings.scm
+	$(CSC) $(CHICKEN_OPTS) -o $@ $< 2>&1
 
 hato-classify: hato-classify.scm let-args.scm
-	$(CSC) $(CHICKEN_OPTS) -o $@ $< 2>&1 | ./filter-csc-warnings.scm
+	$(CSC) $(CHICKEN_OPTS) -o $@ $< 2>&1
 
 hato-classify-static: hato-classify.scm let-args.scm $(SOURCES)
 	$(CSC) $(CHICKEN_OPTS) -unsafe -static -feature static -o $@ $<
 
 hato-fetch: hato-fetch.scm
-	$(CSC) $(CHICKEN_OPTS) -o $@ $< 2>&1 | ./filter-csc-warnings.scm
+	$(CSC) $(CHICKEN_OPTS) -o $@ $< 2>&1
 
 run-compare: run-compare.scm
 	$(CSC) $(CHICKEN_OPTS) -o $@ $<
