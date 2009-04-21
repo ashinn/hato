@@ -6,7 +6,8 @@ syntax: glob
 *.tar.bz2
 *.tar.gz
 *.tgz
-hato-manual.html
+manual/hato-manual.html
+manual/hato-manual-Z-A.scm
 hato-mta
 hato-fetch
 hato-classify
