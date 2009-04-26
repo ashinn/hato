@@ -71,8 +71,9 @@
   smtp-status smtp-message smtp-help smtp?
   domain-part local-part)
 
-(import autoload posix tcp dns extras utils srfi-1
-        hato-archive hato-mime hato-base64 quoted-printable)
+(import scheme chicken extras utils data-structures ports files posix
+        srfi-1 srfi-69 tcp dns
+        autoload hato-archive hato-mime hato-base64 quoted-printable)
 
 (autoload charconv ces-convert)
 (autoload ssl ssl-wrap unwrap-tcp-ports)

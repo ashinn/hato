@@ -1,9 +1,14 @@
 ;; hato-spf.scm
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-(use dns lru-cache srfi-13 hato-mime)
+(require-library dns lru-cache srfi-13 hato-mime)
+
+(module hato-spf
+  (hato-spf-verify?)
+
+(import scheme chicken ports data-structures srfi-13 dns lru-cache hato-mime)
 
 (define hato-spf-cache (make-lru-cache equal: string=?))
 
@@ -71,3 +76,5 @@
                 (else #t))
               (and ((car ls) tcp-address helo-domain from-domain msg headers)
                    (lp (cdr ls)))))))))
+
+)

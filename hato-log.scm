@@ -7,7 +7,8 @@
 
 (module hato-log
   (define-logger log-open log-close log-display log-format
-   log-error-message log-call-chain log-error&call-chain)
+   log-error-message log-call-chain log-error&call-chain
+   current-log-port)
 
 (import scheme chicken extras data-structures ports posix)
 
@@ -34,26 +35,27 @@
                           (lp (cdr ls) (+ (cadar ls) 1) (cons (car ls) res))))
                      (else
                       (lp (cdr ls) (+ i 1) (cons (list (car ls) i) res))))))
+            (normalize-level
+             (lambda (desc)
+               (let ((str (symbol->string desc)))
+                 (if (and (> (string-length str) 4)
+                          (string=? "log-" (substring str 0 4)))
+                     (string->symbol (substring str 4))
+                     desc))))
             (log-descriptions
              (map (lambda (x)
                     (cons
-                     (string->symbol
-                      (if (pair? (cddr x))
-                          (caddr x)
-                          (let ((desc (symbol->string (car x))))
-                            (if (and (> (string-length desc) 4)
-                                     (string=? "log-" (substring desc 0 4)))
-                                (substring desc 4)
-                                desc))))
+                     (if (pair? (cddr x)) (caddr x) (normalize-level (car x)))
                      (cadr x)))
                   loggers))
             (level-getter (car level-info))
             (level-setter (cadr level-info))
-            (default-level (if (pair? (cddr level-info))
-                               (caddr level-info)
-                               (cadr (car (reverse loggers)))))
-            (level-var (r '*log-level*))
-            (level-indexer (r 'x->level))
+            (default-level
+              (if (pair? (cddr level-info))
+                  (caddr level-info)
+                  (cadr (car (reverse loggers)))))
+            (level-var '*log-level*)
+            (level-indexer 'x->level)
             (_define (r 'define))
             (x (r 'x)))
        `(,(r 'begin)
@@ -96,7 +98,7 @@
   (define (pad0 n len)
     (let* ((s (number->string n))
            (diff (- len (string-length s))))
-      (if (> diff 0) (string-append s (make-string diff #\0)) s)))
+      (if (> diff 0) (string-append (make-string diff #\0) s) s)))
   (let ((now (seconds->local-time (current-seconds))))
     ;; this makes lexicographic sort == chronological sort
     (sprintf "~A-~A-~A ~A:~A:~A"

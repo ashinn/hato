@@ -62,6 +62,8 @@
 ;;   Parses a comma-delimited list of email addresses, each parsed
 ;;   according to parse-mail-address.
 
+(require-library posix srfi-1 hato-mime)
+
 (module hato-archive
   (mail-archive-add mail-archive-remove mail-archive-read
    mail-archive-fold mail-archive-for-each mail-archive->list
@@ -72,7 +74,7 @@
    current-mbox-date-string
    )
 
-(import posix extras utils regex srfi-1 hato-mime)
+(import scheme chicken posix extras files ports utils data-structures regex srfi-1 hato-mime)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -294,7 +296,7 @@
                              mode))
               (port (open-output-file* fd))
               (lock (file-lock port)))
-         (set-file-position! port 0 seek/end)
+         ;;(set-file-position! port 0 seek/end)
          (if (zero? (file-position port))
              (ensure-file-owner file uid gid)
              (display nl port))

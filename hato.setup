@@ -1,5 +1,7 @@
 
-(define version 0.400)
+(use make)
+
+(define version (call-with-input-file "VERSION" read-line))
 
 (define-syntax compile-module
   (er-macro-transformer
@@ -11,40 +13,62 @@
             (mod-so (string-append mod-str ".so"))
             (mod-import-so (string-append mod-str ".import.so"))
             (_begin (rename 'begin))
+            (_make (rename 'make))
             (_compile (rename 'compile))
             (_install-extension (rename 'install-extension)))
-       `(,_begin
-         (,_compile -s -O2 -d0 -j ,module ,mod-src)
-         (,_compile -s -O2 -d0 ,mod-src)
-         (,_install-extension
-          ',module
-          '(,mod-so ,mod-import-so)
-          '((version ,version))))))))
+       `(,_make ((,mod-so (,mod-src)
+                          (,_begin
+                           (,_compile -s -O2 -d0 -j ,module ,mod-src)
+                           (,_compile -s -O2 -d0 ,mod-import)
+                           (,_install-extension
+                            ',module
+                            '(,mod-so ,mod-import-so)
+                            '((version ,version)))))))))))
+
+(define-syntax compile-executable
+  (er-macro-transformer
+   (lambda (expr rename compare)
+     (let* ((executable (cadr expr))
+            (exec-str (symbol->string executable))
+            (exec-src (string-append exec-str ".scm"))
+            (_begin (rename 'begin))
+            (_make (rename 'make))
+            (_compile (rename 'compile))
+            (_install-program (rename 'install-program)))
+       `(,_make ((,exec-str (,exec-src)
+                            (,_begin
+                             (,_compile -O2 -d2 ,exec-src)
+                             (,_install-program
+                              ',executable
+                              '(,exec-str)
+                              '((version ,version)))))))))))
 
 (compile-module dns)
-(compile-module domain-keys)
 (compile-module let-args)
 (compile-module lru-cache)
 (compile-module quoted-printable)
-(compile-module user-env)
 (compile-module hato-base64)
 (compile-module hato-uri)
+(compile-module hato-log)
+(compile-module hato-utils)
 (compile-module hato-date)
 (compile-module hato-mime)
 (compile-module hato-archive)
+(compile-module hato-db)
+(compile-module hato-i3db)
 (compile-module hato-config)
 (compile-module hato-daemon)
-(compile-module hato-db)
-(compile-module hato-filter)
-(compile-module hato-i3db)
 (compile-module hato-imap)
-(compile-module hato-log)
 (compile-module hato-md5)
-(compile-module hato-nntp)
+(compile-module domain-keys)
 (compile-module hato-pop)
-(compile-module hato-prob)
+(compile-module hato-nntp)
 (compile-module hato-rfc3028)
 (compile-module hato-smtp)
 (compile-module hato-spf)
 (compile-module hato-token)
+(compile-module hato-prob)
+(compile-module hato-filter-env)
+
+(compile-executable hato-fetch)
 

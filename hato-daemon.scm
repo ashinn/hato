@@ -10,7 +10,7 @@
 (module hato-daemon
   (running-process-id? daemonize daemon-kill)
 
-(import scheme chicken extras posix regex tcp tcp-server)
+(import scheme chicken extras ports posix regex foreign srfi-18 tcp tcp-server)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -91,7 +91,7 @@
               (condition-case (delete-file pid-file)
                 (exn () (warner "error deleting pid-file ~A" pid-file))))
              (else
-              (sleep (* i 0.5))
+              (thread-sleep! (* i 0.5))
               (lp (+ i 1)))))))
      ((number? pid)
       (notifier "removing stale lock file for pid ~A" pid)

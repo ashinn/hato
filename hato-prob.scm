@@ -1,6 +1,6 @@
 ;;;; hato-prob.scm -- classifier probability library
 ;;
-;; Copyright (c) 2005-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; This is where we build up chains of tokens into "features" of the
@@ -14,43 +14,37 @@
 ;; added while waiting for the comparison results to finish their
 ;; overnight runs.  Sorry about that.
 
-(cond-expand
- (static
-  (include "hato-i3db.scm")
-  (include "hato-mime.scm")
-  (include "html-parser.scm"))
- (else
-  (use hato-i3db hato-mime html-parser posix srfi-4)))
+(require-library posix srfi-69 hato-i3db hato-mime html-parser posix hato-token)
 
+(module hato-prob
+  (
+   ;; primary api
+   feature-fold
+   ;; utilities
+   deleet i3db-file-name
+   ;; mail record
+   make-mstats mstats? mstats-words set-mstats-words!
+   mstats-urls set-mstats-urls! mstats-ips set-mstats-ips!
+   mstats-emails set-mstats-emails! mstats-features set-mstats-features!
+   mstats-score set-mstats-score! mstats-count set-mstats-count!
+   mstats-prob set-mstats-prob!
+   )
+
+(import scheme chicken extras data-structures ports posix srfi-69)
+(import html-parser hato-i3db hato-mime hato-token)
 (include "write-number.scm")
-(include "hato-token.scm")
-
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (export
-    ;; primary api
-    token-fold token-fold-full feature-fold
-    ;; utilities
-    char-script char-separator? deleet i3db-file-name
-    ;; mail record
-    make-mstats mstats? mstats-words set-mstats-words!
-    mstats-urls set-mstats-urls! mstats-ips set-mstats-ips!
-    mstats-emails set-mstats-emails! mstats-features set-mstats-features!
-    mstats-score set-mstats-score! mstats-count set-mstats-count!
-    mstats-prob set-mstats-prob!  )))
- (else
-  ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; compile with "-feature debug" for more debugging info
 
 (cond-expand
  (debug
-  (define-macro (debug fmt . args)
-    `(fprintf (current-error-port) ,fmt ,@args)))
+  (define-syntax debug
+    (syntax-rules ()
+      ((debug fmt args ...)
+       (fprintf (current-error-port) fmt args ...)))))
  (else
-  (define-macro (debug fmt . args) #t)))
+  (define-syntax debug (syntax-rules () ((debug fmt args ...) #t)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; list utils
@@ -64,11 +58,6 @@
     (if (null? ls)
       (reverse res)
       (lp (cdr ls) (if (pred (car ls)) (cons (car ls) res) res)))))
-
-;; (define (list->hash-table ls . o)
-;;   (let ((tab (apply make-hash-table o)))
-;;     (for-each (lambda (x) (hash-table-set! tab (car x) (cdr x))) ls)
-;;     tab))
 
 (define (unique ls . o)
   (let-optionals* o ((eq equal?) (key identity))
@@ -678,3 +667,5 @@
           (else
            (token-fold line acc kons kons kons-url kons-ip kons-email)
            (lp)))))))
+
+)

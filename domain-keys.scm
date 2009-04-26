@@ -42,14 +42,13 @@
 ;; Convenience routine, returns a complete new MAIL-TEXT string, signed
 ;; as with the same arguments to DOMAIN-KEY-SIGNATURE.
 
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (export domain-key-verify domain-key-sign domain-key-signature
-           dkey-normalize-simple dkey-normalize-nofws)))
- (else))
+(require-library dns hato-base64 hato-mime)
 
-(require-extension regex posix dns hato-base64 hato-mime)
+(module domain-keys
+  (domain-key-verify domain-key-sign domain-key-signature
+   dkey-normalize-simple dkey-normalize-nofws)
+
+(import scheme chicken extras ports data-structures regex posix dns hato-base64 hato-mime)
 
 (define (string-strip-whitespace str)
   (string-translate str " \t"))
@@ -257,3 +256,5 @@
    (apply domain-key-signature mail-string private-key-file o)
    "\n"
    mail-string))
+
+)

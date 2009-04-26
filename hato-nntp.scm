@@ -5,7 +5,20 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use autoload tcp extras utils posix srfi-1)
+(require-library srfi-1 autoload)
+
+(module hato-nntp
+  (nntp-connect nntp-disconnect nntp-status nntp-message
+   nntp-article nntp-body nntp-group nntp-head
+   nntp-ihave nntp-last nntp-list nntp-newgroups
+   nntp-newnews nntp-next nntp-post nntp-quit
+   nntp-slave nntp-stat nntp-list->list
+   nntp-head->alist call-with-nntp-article
+   nntp-newgroups-fold nntp-newnews-fold nntp?
+   post-article
+   )
+
+(import scheme chicken extras utils ports data-structures posix tcp srfi-1 autoload)
 (autoload hato-smtp smtp-write-message)
 (autoload hato-mime mime-headers->list)
 
@@ -19,23 +32,6 @@
   (debug? nntp-debug?)
   (locked? nntp-locked? nntp-locked?-set!)
   )
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(cond-expand
- ((and chicken compiling)
-  (declare
-   (export nntp-connect nntp-disconnect nntp-status nntp-message
-           nntp-article nntp-body nntp-group nntp-head
-           nntp-ihave nntp-last nntp-list nntp-newgroups
-           nntp-newnews nntp-next nntp-post nntp-quit
-           nntp-slave nntp-stat nntp-list->list
-           nntp-head->alist call-with-nntp-article
-           nntp-newgroups-fold nntp-newnews-fold nntp?
-           post-article
-           )))
- (else))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -302,3 +298,4 @@
          (apply smtp-write-message (nntp-out nntp) keys)
          (nntp-get-response nntp))))
 
+)

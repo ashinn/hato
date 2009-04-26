@@ -81,16 +81,6 @@
        (thunk)
        (lp)))))
 
-(define (with-timeout timeout thunk . o)
-  (let* ((th (make-thread thunk))
-         (timeout-val (list 'timeout))
-         (res (thread-join! (thread-start! th) timeout timeout-val)))
-    (if (eq? res timeout-val)
-      (if (pair? o)
-        ((car o))
-        (error "timeout exceeded" timeout))
-      res)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; File Utils
 

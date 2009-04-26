@@ -6,13 +6,30 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(require-extension
- numbers posix tokyocabinet extras utils regex srfi-1 srfi-13 srfi-69
- hato-archive hato-uri hato-pop hato-imap hato-smtp hato-mime
- hato-config hato-filter hato-date hato-daemon hato-db hato-log
- domain-keys let-args)
+(require-library hato-filter-env)
 
-(define-logger (current-log-level set-current-log-level! log-info)
+(module hato-fetch (main)
+
+(import (except scheme + - * / = > < >= <= number->string string->number
+                eqv? equal? exp log sin cos tan atan acos asin expt sqrt
+                quotient modulo remainder numerator denominator abs min max
+                gcd lcm positive? negative? odd? even? zero? exact? inexact?
+                floor ceiling truncate round inexact->exact exact->inexact
+                number? complex? real? rational? integer? real-part imag-part
+                magnitude))
+(import (except chicken add1 sub1 signum bitwise-and bitwise-ior bitwise-xor
+                bitwise-not arithmetic-shift))
+(import (except extras random randomize))
+(require-extension
+ utils regex data-structures ports posix numbers
+ srfi-1 srfi-13 srfi-69
+ tokyocabinet let-args domain-keys safe-eval
+ hato-archive hato-uri hato-pop hato-imap hato-smtp hato-mime
+ hato-utils hato-config hato-date hato-prob hato-daemon hato-db
+ hato-log)
+(import (only hato-filter-env make-mail))
+
+(define-logger (current-log-level set-current-log-level! info)
   (log-emergency ; the server is on fire!!!           
    log-alert     ; couldn't write to user mailbox     
    log-critical  ; couldn't run 'dig' executable      
@@ -22,120 +39,17 @@
    log-info      ; loaded alias file                  
    log-debug))   ; spam-probability: 0.5
 
-(define (with-stty x thunk) (thunk))
-
 (define *program-name* "hato-fetch")
 (define-syntax read-version
   (er-macro-transformer
    (lambda (e r c) (call-with-input-file "VERSION" read-line))))
 (define *program-version* (read-version))
 
+(define (expand-path path)
+  (expand-user-path (current-user-id) path))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; general utilities
-
-(define (get-user-home user)
-  (caddr (cdddr (user-information user))))
-
-(define (expand-path path . o)
-  (apply expand-user-dir (current-user-name) path o))
-
-(define (expand-user-dir user path . o)
-  (cond
-   ((equal? path "")
-    (if (pair? o) (car o) (get-user-home user)))
-   ((eqv? #\~ (string-ref path 0))
-    (let ((slash (string-index path #\/)))
-      (cond
-       ((eqv? 1 slash)
-        (string-append (get-user-home user) (substring path 1)))
-       (slash
-        (string-append (get-user-home (substring path 1 slash))
-                       (substring path slash)))
-       (else
-        (string-append (get-user-home (substring path 1)) "/")))))
-   ((eqv? #\/ (string-ref path 0))
-    path)
-   (else
-    (let ((dir (if (pair? o) (car o) (get-user-home user))))
-      (string-append
-       dir
-       (if (and (not (equal? "" dir))
-                (not (eqv? #\/ (string-ref dir (- (string-length dir) 1)))))
-           "/"
-           "")
-       path)))))
-
-(define (port-open? port)
-  (and (port? port)
-       (not (##sys#slot port 8))))
-
-(define (copy-port in out)
-  (let lp ()
-    (let ((str (read-string 1024 in)))
-      (if (not (equal? str ""))
-          (begin
-            (write-string str #f out)
-            (lp))))))
-
-(define (create-directory* dir . o)
-  (let create ((dir dir) (limit (if (pair? o) (car o) 10)))
-    (condition-case (begin (create-directory dir) #t)
-      (exn ()
-           (or
-            (and (positive? limit)
-                 (let ((parent
-                        (pathname-directory
-                         (string-trim-right dir))))
-                   (and (not (string=? parent ""))
-                        (not (string=? parent "/"))
-                        (not (file-exists? parent))
-                        (create parent (- limit 1))
-                        (begin
-                          (create-directory dir)
-                          #t))))
-            (signal exn))))))
-
-(define (read-password prompt . o)
-  (let ((verify (if (pair? o) (car o) (lambda (x) #t))))
-    (let lp ((count 3))
-      (cond
-       ((zero? count)
-        #f)
-       (else
-        (display prompt)
-        (let ((pass (with-stty '(not echo) read-line)))
-          (newline)
-          (let ((res (verify pass)))
-            (if res
-                pass
-                (lp (- count 1))))))))))
-
-(define fifo-clear
-  (let ((buf (make-string 1)))
-    (lambda (fd . o)
-      (receive (in? out?) (apply file-select fd #f o)
-        (let ((res (and in? (file-read fd 1 buf))))
-          (if (and in? (= 1 (cadr res)))
-              (fifo-clear fd)))))))
-
-(define exception-message
-  (let ((get-msg (condition-property-accessor 'exn 'message))
-        (get-args (condition-property-accessor 'exn 'arguments)))
-    (lambda (exn) (sprintf "~A ~S" (get-msg exn) (get-args exn)))))
-
-(define (die-with-exit-code n fmt . args)
-  (let ((msg (apply sprintf fmt args))
-        (out (if (and (output-port? (current-error-port))
-                      (port-open? (current-error-port)))
-                 (current-error-port)
-                 current-log-port)))
-    (display msg out)
-    (if (not (eqv? #\newline (string-ref msg (- (string-length msg) 1))))
-        (newline out)))
-  (exit n))
-
-(define (die . args)
-  (apply die-with-exit-code (if (number? (car args)) args (cons 1 args))))
+;; list utilities
 
 (define (unique/sorted ls . o)
   (if (null? ls)
@@ -710,7 +624,9 @@
                                      (car mboxes)))
                                 '(1 . *))))
                              ;; include any imap-level filtering
-                             (range (append filt-imap range))
+                             (range (if (pair? filt-imap)
+                                        (append filt-imap (list range))
+                                        range))
                              ;; collect the results
                              (res
                               (if (null? range)
@@ -720,10 +636,12 @@
                                    range
                                    (lambda (id text acc)
                                      (let ((headers
-                                            (call-with-input-string text
-                                              mime-headers->list)))
+                                            (call-with-input-string
+                                             text
+                                             mime-headers->list)))
                                        (set! last-msgid
-                                             (mime-ref headers "Message-Id"))
+                                             (string-trim-both
+                                              (mime-ref headers "Message-Id")))
                                        (if (filt-man text headers)
                                            (cons (cons id (car acc))
                                                  (kons text headers (cdr acc)))
@@ -767,7 +685,7 @@
                                   (uidvalidity
                                    ,(cond ((assq 'UIDVALIDITY status) => cdr)
                                           (else #f))))))
-                          (log-debug "history: ~S" new-hist)
+                          (log-debug "saved history: ~S" new-hist)
                           (lp (cdr mboxes) res (cons new-hist statuses))
                           )))))))))))))))
 
@@ -909,7 +827,7 @@
         (let ((new-proc (condition-case (load-user-filter file)
                           (exn ()
                                (log-error "error loading filter")
-                               (log-error&call-chain exn)
+                               (log-error&call-chain 'error exn)
                                #f))))
           (cond
            (new-proc
@@ -923,8 +841,15 @@
              (msgid (mime-ref headers "Message-Id"))
              (mail (make-mail text headers)))
         (condition-case
-            (let lp ((res (with-output-to-port current-log-port
-                            (lambda () (proc addr mail)))))
+            (let lp ((res
+                      (with-timeout
+                       (conf-get dest 'filter-timeout 60)
+                       (lambda ()
+                         (with-output-to-port current-log-port
+                           (lambda ()
+                             (safe-apply-as-user
+                              (lambda () (proc addr mail))
+                              (current-user-id))))))))
               (cond
                ((and (pair? res) (memq (car res) '(discard reject refuse)))
                 (log-notice "discarding ~A from ~A" msgid addr)
@@ -936,9 +861,10 @@
                                dest))
                  text headers))
                ((and (pair? res) (eq? 'file (car res)))
-                (let ((path (expand-user-dir
+                (let ((path (expand-user-path
                              (current-user-name)
                              (cadr res)
+                             get-user-home
                              (conf-get dest 'maildir "~/Mail/"))))
                   (log-notice "adding ~A from ~A to ~A" msgid addr path)
                   (mail-archive-add path text (conf-get dest 'default-format))))
@@ -956,7 +882,7 @@
                 #f)))
           (exn ()
                (log-error "error in user filter")
-               (log-error&call-chain exn)
+               (log-error&call-chain 'error exn)
                ((default-output-handler dest) text headers)
                #f))))))
 
@@ -1079,7 +1005,7 @@
                     ((vector? (cadr x)) (local-time->seconds (cadr x)))
                     ((string->number (->string (cadr x))))
                     ((parse-date (->string (cadr x))))
-                    (else (error "invalid date" (cadr x))))))
+                    (else (error "compile-filter: invalid date" (cadr x))))))
          (lambda (text headers)
            (let ((dt (case (car x)
                        ((before on since)
@@ -1102,7 +1028,7 @@
            (any (lambda (pat) (string-contains-ci text pat)) keywords))))
       ((header)
        (if (not (= 3 (length x)))
-           (error "header filter requires two arguments" x)
+           (error "compile-filter: header filter requires two arguments" x)
            (let ((str (cadr x))
                  (pat (caddr x)))
              (lambda (text headers)
@@ -1127,7 +1053,7 @@
           (lambda (text headers)
             (mime-ref headers str)))))
    (else
-    (error "unknown filter" x))))
+    (error "compile-filter: unknown filter" x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; user filters
@@ -1144,28 +1070,22 @@
 (define (load-user-filter file)
   (let ((sexp-ls (parameterize ((case-sensitive #f))
                    (file->sexp-list file))))
-    (eval `(lambda (addr mail)
-             (define current-address (make-parameter addr))
-             (define current-mail (make-parameter mail))
-             (define %domain-key-verify domain-key-verify)
-             ,(remove
-               (lambda (x)
-                 (and (pair? x)
-                      (eq? 'define (car x))
-                      (pair? (cdr x))
-                      (memq (if (pair? (cadr x)) (caadr x) (cadr x))
-                            '(open-db current-address current-mail))))
-               hato-user-env-definitions)
-             (call-with-current-continuation
-               (lambda (return)
-                 (letrec
-                     ((reject
-                       (lambda o (return (cons 'reject o))))
-                      (discard
-                       (lambda o (return (cons 'discard o))))
-                      (refuse
-                       (lambda o (return (cons 'refuse o)))))
-                   ,@sexp-ls)))))))
+    (safe-eval-as-user
+     `(lambda (addr mail)
+        (current-address addr)
+        (current-mail mail)
+        (call-with-current-continuation
+         (lambda (return)
+           (letrec
+               ((reject
+                 (lambda o (return (cons 'reject o))))
+                (discard
+                 (lambda o (return (cons 'discard o))))
+                (refuse
+                 (lambda o (return (cons 'refuse o)))))
+             ,@sexp-ls))))
+     '(regex hato-filter-env)
+     (current-user-id))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; remember the last time we fetched something
@@ -1176,13 +1096,20 @@
         cfg
         (let ((res
                (let ((path (expand-path "~/.hato/fetch/history.db")))
-                 (and (db-file? path)
-                      (let* ((db (open-db path))
-                             (res (db-ref db uri)))
-                        (close-db db)
-                        (condition-case
-                            (call-with-input-string res read)
-                          (exn () #f)))))))
+                 (cond
+                  ((not (db-file? path))
+                   (if (file-exists? path)
+                       (log-warn "not a database file: ~S" path))
+                   #f)
+                  (else
+                   (let* ((db (open-db path))
+                          (res (db-ref db uri)))
+                     (close-db db)
+                     (condition-case
+                         (call-with-input-string res read)
+                       (exn ()
+                            (log-warn "couldn't read database data: ~S" res)
+                            #f))))))))
           (if (pair? res)
               (conf-extend res cfg)
               cfg)))))
@@ -1329,8 +1256,8 @@ Options:
        (cons (cond
               ((> (length mboxes) 1)
                (parse-output-uri (last mboxes)))
-              ((file-exists?
-                (expand-path "~/.hato/filter"))
+              ((file-exists? (expand-path "~/.hato/filter"))
+               (log-notice "using filter output")
                `((protocol hato) (file #f)))
               ((conf-get config 'destination)
                => (lambda (dest)
@@ -1349,7 +1276,7 @@ Options:
               (and acc
                    (every (lambda (f) (f text headers)) to-ls)))
             #t)
-    (exn () (log-error&call-chain exn))))
+    (exn () (log-error&call-chain 'error exn))))
 
 (define (main args)
   (let-args args
@@ -1413,6 +1340,7 @@ Options:
                              (if (conf-get config 'debug?) 7 6))))
           (if (and (integer? log-level) (<= 1 log-level 10))
               (set! current-log-level log-level)))
+        (log-notice "config: ~S" config)
 
         ;; warn users about bad config entries
         (conf-verify
@@ -1431,7 +1359,7 @@ Options:
                   (destination)
                   (fifo-file filename)
                   (file filename)
-                  (filter (alist (symbol object)))
+                  (filter (list (list symbol object)))
                   (from string)
                   (host string)
                   (interval integer)
@@ -1448,7 +1376,7 @@ Options:
                   (pid-file filename)
                   (port integer)
                   (protocol symbol)
-                  (remove (alist (symbol object)))
+                  (remove (list (list symbol object)))
                   (smtp-host string)
                   (ssl? boolean)
                   (to string)
@@ -1474,7 +1402,6 @@ Options:
           (let ((pid (condition-case (call-with-input-file pid-file read)
                        (exn () #f))))
             (if (and (number? pid) (running-process-id? pid "hato-fetch"))
-                ;;(process-signal pid signal/hup)
                 (let ((fd (file-open fifo-file
                                      (bitwise-ior open/rdwr open/nonblock))))
                   (file-write fd "f" 1)
@@ -1569,12 +1496,11 @@ Options:
               (for-each (lambda (x) (run-fetch (cdr x) dest)) src))))))))
 
     ;; start
-;;     (set-signal-handler!
-;;      signal/hup
-;;      (lambda (n)
-;;        (log-notice "received SIGHUP, reloading")
-;;        (run #t)))
     (run #f)))
+
+)
+
+(import hato-fetch)
 
 (main (command-line-arguments))
 

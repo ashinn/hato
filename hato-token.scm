@@ -1,6 +1,6 @@
 ;;;; hato-token.scm -- unicode-aware word tokenizer
 ;;
-;; Copyright (c) 2005 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; token-fold str knil kons [kons-alpha kons-url kons-ip kons-email...]
@@ -29,34 +29,39 @@
 ;;   consideration then for Thai characters is to break by logical
 ;;   syllables.
 
+(require-extension srfi-4)
+
+(module hato-token
+  (token-fold)
+
+(import scheme chicken extras srfi-4)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Unicode character utilities
 
-(eval-when (compile eval)
-
-(define-macro (make-shifted-bit-vector ranges)
-  (define (cadr* x) (if (pair? (cdr x)) (cadr x) (car x)))
-  (let* ((lo (apply min (map car ranges)))
-         (hi (fx+ 1 (apply max (map cadr* ranges))))
-         (v (make-u8vector (arithmetic-shift (fx+ 8 (fx- hi lo)) -3) 0)))
-    (let lp1 ((ls ranges))
-      (if (null? ls)
-          `(u8vector ,@(u8vector->list v))
-          (let ((limit (fx- (cadr* (car ls)) lo)))
-            (let lp2 ((i (fx- (caar ls) lo)))
-              (let ((off (arithmetic-shift i -3))
-                    (bit (arithmetic-shift 1 (bitwise-and i #b111))))
-                (u8vector-set! v off (bitwise-ior (u8vector-ref v off) bit))
-                (if (fx>= i limit) (lp1 (cdr ls)) (lp2 (fx+ i 1))))))))))
-
-)
+(define-syntax make-shifted-bit-vector
+  (er-macro-transformer
+   (lambda (expr rename compare)
+     (define (cadr* x) (if (pair? (cdr x)) (cadr x) (car x)))
+     (let* ((lo (apply min (map car (cadr expr))))
+            (hi (fx+ 1 (apply max (map cadr* (cadr expr)))))
+            (v (make-u8vector (arithmetic-shift (fx+ 8 (fx- hi lo)) -3) 0)))
+       (let lp1 ((ls (cadr expr)))
+         (if (null? ls)
+             `(u8vector ,@(u8vector->list v))
+             (let ((limit (fx- (cadr* (car ls)) lo)))
+               (let lp2 ((i (fx- (caar ls) lo)))
+                 (let ((off (arithmetic-shift i -3))
+                       (bit (arithmetic-shift 1 (bitwise-and i #b111))))
+                   (u8vector-set! v off (bitwise-ior (u8vector-ref v off) bit))
+                   (if (fx>= i limit) (lp1 (cdr ls)) (lp2 (fx+ i 1))))))))))))
 
 (define (bit-check? v i)
   (let ((off (arithmetic-shift i -3))
         (bit (arithmetic-shift 1 (bitwise-and i #b111))))
     (fx> (bitwise-and (u8vector-ref v off) bit) 0)))
 
-(define lo-seperator-chars
+(define lo-separator-chars
   (make-shifted-bit-vector
     ((#x0000 #x0016) ; CONTROLS AND SPACE
      (#x0022) ; "
@@ -149,35 +154,35 @@
 ;;
 (define (char-separator? i)
   (if (fx<= i #x30FB)
-    (bit-check? lo-seperator-chars i)
+    (bit-check? lo-separator-chars i)
     (if (and (fx>= i #xFD3E) (fx<= i #xFF5B))
       (bit-check? hi-separator-chars (fx- i #xFD3E))
       #f)))
 
-(eval-when (compile eval)
-
-(define-macro (range-case i . ranges)
-  (define (split-at! ls i)
-    (let lp ((post ls) (pre '()) (i i))
-      (if (<= i 0)
-        (values (reverse pre) post)
-        (lp (cdr post) (cons (car post) pre) (- i 1)))))
-  (define (build-clauses ls tmp)
-    (let ((len (length ls)))
-      (case len
-        ((1) (cadar ls))
-        ((2) `(if (< ,tmp ,(caadr ls)) ,(cadar ls) ,(cadadr ls)))
-        (else
-         (receive (head tail) (split-at! ls (quotient (length ls) 2))
-           `(if (< ,tmp ,(caar tail))
-              ,(build-clauses head tmp)
-              ,(build-clauses tail tmp)))))))
-  (let lp ((ls (sort ranges (lambda (a b) (< (car a) (car b)))))
-           (tmp (gensym)))
-    `(let ((,tmp ,i))
-       ,(build-clauses ls tmp))))
-
-)
+(define-syntax range-case
+  (er-macro-transformer
+   (lambda (expr rename compare)
+     (define (split-at ls i)
+       (let lp ((post ls) (pre '()) (i i))
+         (if (<= i 0)
+             (list (reverse pre) post)
+             (lp (cdr post) (cons (car post) pre) (- i 1)))))
+     (define (build-clauses ls tmp)
+       (let ((len (length ls)))
+         (case len
+           ((1) (cadar ls))
+           ((2) `(if (< ,tmp ,(caadr ls)) ,(cadar ls) ,(cadadr ls)))
+           (else
+            (let* ((head+tail (split-at ls (quotient (length ls) 2)))
+                   (head (car head+tail))
+                   (tail (cadr head+tail)))
+              `(if (< ,tmp ,(caar tail))
+                   ,(build-clauses head tmp)
+                   ,(build-clauses tail tmp)))))))
+     (let lp ((ls (sort (cddr expr) (lambda (a b) (< (car a) (car b)))))
+              (tmp (rename 'tmp)))
+       `(,(rename 'let) ((,tmp ,(cadr expr)))
+         ,(build-clauses ls tmp))))))
 
 ;; *Not* general purpose (most notably ignores the 'common script) but
 ;; works for our purposes since we never call it on punctuation or other
@@ -478,3 +483,4 @@
     (token-fold-full str knil kons kons-alpha kons-url kons-ip kons-email
                      start end separators punctuation email-chars url-chars)))
 
+)

@@ -8,26 +8,23 @@
 (module hato-db
   (db? db-file? open-db close-db db-ref db-set! db-delete!)
 
-(import scheme chicken tokyocabinet)
+(import scheme chicken extras ports lolevel tokyocabinet)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Primarily for white-lists and message-id databases.
 
 (define (db-file? file)
-  (define (ascii? c)
-    (or (<= #x20 c #x7F)
-        (memv c '(#x09 #x0A #x0D))))
   (and (file-exists? file)
-       (call-with-input-file file
-         (lambda (in) ; XXXX check the magic
-           (or (not (ascii? (read-byte in)))
-               (not (ascii? (read-byte in)))
-               (not (ascii? (read-byte in)))
-               (not (ascii? (read-byte in))))))))
+       (equal? "ToKyO CaBiNeT" (call-with-input-file file read-line))))
 
 (define db? pointer?)
 (define (open-db file . o)
-  (apply tc-hdb-open file o))
+  (let* ((read-only? (and (pair? o) (car o)))
+         (flags
+          (if read-only?
+              (fx+ TC_HDBOREADER TC_HDBOCREAT)
+              (fx+ TC_HDBOWRITER (fx+ TC_HDBOREADER TC_HDBOCREAT)))))
+    (tc-hdb-open file #:flags flags #:tune-opts TC_HDBTDEFLATE)))
 (define (close-db db)
   (tc-hdb-close db))
 (define (db-ref db key . o)

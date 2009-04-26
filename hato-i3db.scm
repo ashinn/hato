@@ -1,29 +1,27 @@
 ;;;; hato-i3db.scm -- int -> int x int database
 ;;
-;; Copyright (c) 2003-2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2003-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-(require-extension posix lolevel srfi-4)
+(require-extension posix srfi-4)
 
-(cond-expand
- (compiling
-  (declare
-   (export
-    i3db-open i3db-ref i3db-set! i3db-update! i3db-close i3db-hash
-    make-i3db i3db?
-    i3db-fd set-i3db-fd!
-    i3db-mmap set-i3db-mmap!
-    i3db-ptr set-i3db-ptr!
-    i3db-spam set-i3db-spam!
-    i3db-ham set-i3db-ham!
-    i3db-mask set-i3db-mask!
-    i3db-bytes set-i3db-bytes!
-    i3db-salt set-i3db-salt!
-    i3db-reader set-i3db-reader!
-    i3db-writer set-i3db-writer!
-    write-binary-uint32
-    )))
- (else))
+(module hato-i3db
+  (i3db-open i3db-ref i3db-set! i3db-update! i3db-close i3db-hash
+   make-i3db i3db?
+   i3db-fd set-i3db-fd!
+   i3db-mmap set-i3db-mmap!
+   i3db-ptr set-i3db-ptr!
+   i3db-spam set-i3db-spam!
+   i3db-ham set-i3db-ham!
+   i3db-mask set-i3db-mask!
+   i3db-bytes set-i3db-bytes!
+   i3db-salt set-i3db-salt!
+   i3db-reader set-i3db-reader!
+   i3db-writer set-i3db-writer!
+   write-binary-uint32
+   )
+
+(import scheme chicken extras posix lolevel srfi-4)
 
 (define (pointer-u24-ref ptr)
   (bitwise-ior (arithmetic-shift (pointer-u16-ref ptr) 8)
@@ -213,9 +211,16 @@
 
 (define write-binary-uint32
   (lambda (n fd)
-    (let* ((vec (make-byte-vector 4 0))
-           (u32 (byte-vector->u32vector vec)))
-      (u32vector-set! u32 0 n)
-      (file-write fd vec))))
+;;     (let* ((vec (make-byte-vector 4 0))
+;;            (u32 (byte-vector->u32vector vec)))
+;;       (u32vector-set! u32 0 n)
+;;       (file-write fd vec))
+    (let ((vec (make-string 4)))
+      (string-set! vec 0 (bitwise-and n #xFF))
+      (string-set! vec 1 (bitwise-and (arithmetic-shift n -8) #xFF))
+      (string-set! vec 2 (bitwise-and (arithmetic-shift n -16) #xFF))
+      (string-set! vec 3 (bitwise-and (arithmetic-shift n -24) #xFF))
+      (file-write fd vec))
+    ))
 
-
+)

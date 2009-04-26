@@ -18,7 +18,7 @@
    pop3-retr pop3-rset pop3-stat pop3-top pop3-uidl pop3-user
    pop3-resp pop3-retr->string pop3-top->string pop3-headers)
 
-(import scheme chicken extras utils srfi-1  tcp autoload hato-mime)
+(import scheme chicken extras utils ports data-structures srfi-1  tcp autoload hato-mime)
 
 (autoload openssl ssl-connect)
 (autoload hato-md5 md5-digest)

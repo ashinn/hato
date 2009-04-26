@@ -14,7 +14,7 @@
    uri-encode uri-decode
    uri-query->alist uri-alist->query)
 
-(import scheme chicken)
+(import scheme chicken data-structures)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

@@ -5,7 +5,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(require-library srfi-1 srfi-13 hato-db)
+(require-library srfi-1 srfi-13 srfi-69 matchable hato-db)
 
 (module hato-config
  (assq-ref read-from-file alist? conf?
@@ -14,7 +14,7 @@
   conf-multi conf-extend conf-verify
   conf-load-table)
 
-(import scheme chicken srfi-1 srfi-13 extras utils posix hato-db)
+(import scheme chicken data-structures srfi-1 srfi-13 srfi-69 extras utils files posix ports hato-db)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Config lists (cascaded lists of alists)
@@ -239,9 +239,11 @@
                        (cons `(list ,(car cell)) x) (cadr def) warn))
                     (cell-list))))
       ((alist)
-       (every*
-        (lambda (cell) (conf-verify-one cell (cdr def) warn))
-        (cell-list)))
+       ;;(every*
+       ;; (lambda (cell) (conf-verify-one cell (cdr def) warn))
+       ;; (cell-list))
+       (alist? (cell-list))
+       )
       ((or)
        (or (any (lambda (x) (conf-verify-match cell x identity))
                 (cdr def))

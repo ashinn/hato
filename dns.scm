@@ -9,7 +9,7 @@
 (module dns
  (dns-query dns-response dns-lookup dns-text dns-mx)
 
-(import scheme chicken posix)
+(import scheme chicken extras data-structures posix)
 
 ;(use udp lolevel srfi-4)
 

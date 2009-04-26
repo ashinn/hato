@@ -1,18 +1,18 @@
 ;; hato-rfc3028.scm -- sieve: a mail filtering language
 ;;
-;; Copyright (c) 2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2008-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; http://www.faqs.org/rfcs/rfc3028.html
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use extras regex srfi-1 srfi-8 srfi-13)
+(require-library srfi-1 srfi-13 matchable)
 
-(cond-expand
- ((and chicken compiling)
-  (declare (export rfc3028-sieve-read rfc3028-sieve->scheme)))
- (else))
+(module hato-rfc3028
+  (rfc3028-sieve-read rfc3028-sieve->scheme)
+
+(import scheme chicken extras data-structures regex srfi-1 srfi-13 matchable)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -300,3 +300,5 @@
           (adjust-begins (cadr x))
           (map adjust-begins x))
       x))
+
+)

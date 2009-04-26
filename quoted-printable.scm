@@ -42,15 +42,14 @@
 ;; This API is backwards compatible with the Gauche library
 ;; rfc.quoted-printable.
 
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (fixnum)
-   (export
-    quoted-printable-encode quoted-printable-encode-string
-    quoted-printable-encode-header
-    quoted-printable-decode quoted-printable-decode-string)))
- (else))
+(declare (fixnum))
+
+(module quoted-printable
+  (quoted-printable-encode quoted-printable-encode-string
+   quoted-printable-encode-header
+   quoted-printable-decode quoted-printable-decode-string)
+
+(import scheme chicken extras ports data-structures)
 
 (define-constant *default-max-col* 76)
 
@@ -156,3 +155,5 @@
 
 (define (quoted-printable-decode . o)
   (display (apply quoted-printable-decode-string o)))
+
+)

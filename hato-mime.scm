@@ -65,12 +65,15 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(require-library hato-base64 quoted-printable charconv)
+
 (module hato-mime
   (mime-ref assoc-ref mime-header-fold mime-headers->list
    mime-parse-content-type mime-decode-header
    mime-message-fold)
 
-(import scheme chicken extras hato-base64 quoted-printable charconv)
+(import scheme chicken extras ports data-structures)
+(import hato-base64 quoted-printable charconv)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; warn on invalid headers in debug mode
@@ -316,9 +319,9 @@
                             ,@parent-seed)))
                        (headers
                         (if (pair? o) (car o) (mime-headers->list port))))
-      (let fold ((parent-headers '())
-                 (headers headers)
-                 (seed init-seed))
+      (let tfold ((parent-headers '())
+                  (headers headers)
+                  (seed init-seed))
         (let* ((ctype (mime-parse-content-type
                        (mime-ref headers "Content-Type" "text/plain")))
                (type (caar ctype))
@@ -338,7 +341,8 @@
                      (if (null? part-headers)
                          (kons-end headers seed part-seed)
                          (let ((part (mime-read-part port cte enc boundary)))
-                           (lp (fold kons port headers2 acc))))))))
+                           (lp (tfold parent-headers part-headers part-seed))
+                           ))))))
            (else
             (let ((body (mime-read-part port cte enc #f)))
               (kons parent-headers headers body seed)))))))))

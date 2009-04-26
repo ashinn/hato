@@ -21,7 +21,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(require-library autoload tcp srfi-1 srfi-13 srfi-18)
+(require-library autoload matchable tcp srfi-1 srfi-13 srfi-18)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -38,7 +38,8 @@
    imap-fetch-one-body imap-fetch-one-body/uid
    imap-store imap-store/uid imap-copy imap-copy/uid)
 
-(import scheme chicken extras srfi-1 srfi-13 srfi-18 posix tcp autoload)
+(import scheme chicken extras matchable data-structures
+        srfi-1 srfi-13 srfi-18 posix tcp autoload)
 
 (autoload openssl ssl-connect)
 
@@ -825,8 +826,10 @@
 (define imap-fetch-fold/uid
   (imap-reconnect-wrapper
    (lambda (imap what kons . o)
+     (fprintf (current-error-port) "imap-fetch-fold/uid ~S\n" what)
      (let ((set (imap-message-set/uid imap what))
            (knil (if (pair? o) (car o) '())))
+       (fprintf (current-error-port) "knil: ~S\n" knil)
        (if (or (not set) (null? set))
            knil
            (imap-get-response

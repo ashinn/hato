@@ -38,12 +38,6 @@
 ;; General algorithm based on "Printing Floating-Point Numbers Quickly
 ;; and Accurately" (FP-Printing-PLDI96.pdf).
 
-(cond-expand
- (compiling
-  (declare
-   (export write-number number->string*)))
- (else))
-
 (define-inline (imag-part x) 0)
 (define-inline (real-part x) x)
 

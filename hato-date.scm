@@ -11,7 +11,7 @@
   (parse-date wday->number mon->number
    date<=? date>=? date=? time<=? time>=? time=?)
 
-(import scheme chicken extras regex posix srfi-13 regex-case)
+(import scheme chicken extras regex posix data-structures srfi-13 regex-case)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

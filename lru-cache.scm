@@ -1,6 +1,6 @@
 ;;; lru-cache.scm -- simple least-recently-used cache
 ;;
-;; Copyright (c) 2005 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2005-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;; Procedure: make-lru #!key equal size-limit compute-size
@@ -31,11 +31,10 @@
 ;;
 ;; Directly set a value in the cache.
 
-(cond-expand
- ((and compiling (not static))
-  (declare
-   (export make-lru-cache lru-cache? lru-ref lru-ref! lru-set!)))
- (else))
+(module lru-cache
+  (make-lru-cache lru-cache? lru-ref lru-ref! lru-set!)
+
+(import scheme chicken srfi-69)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; simple transparent queues
@@ -83,7 +82,8 @@
   (let ((tab (make-hash-table equal-pred hash-func init-size)))
     (%make-lru-cache tab (make-q) 0 size-limit compute-size)))
 
-(define-macro (lru-entry . args) `(vector ,@args))
+(define-syntax lru-entry
+  (syntax-rules () ((lru-entry args ...) (vector args ...))))
 (define-inline (lru-entry-key e)   (vector-ref e 0))
 (define-inline (lru-entry-value e) (vector-ref e 1))
 (define-inline (lru-entry-size e)  (vector-ref e 2))
@@ -166,3 +166,5 @@
 ;                    (and (vector? prev) (lru-entry-key prev))
 ;                    (and (vector? cur-prev) (lru-entry-key cur-prev))))
 ;         (lp (cdr q) cur)))))
+
+)
