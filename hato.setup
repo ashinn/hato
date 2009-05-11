@@ -18,8 +18,8 @@
             (_install-extension (rename 'install-extension)))
        `(,_make ((,mod-so (,mod-src)
                           (,_begin
-                           (,_compile -s -O2 -d0 -j ,module ,mod-src)
-                           (,_compile -s -O2 -d0 ,mod-import)
+                           (,_compile -s -O2 -j ,module ,mod-src)
+                           (,_compile -s -O2 ,mod-import)
                            (,_install-extension
                             ',module
                             '(,mod-so ,mod-import-so)
@@ -45,6 +45,7 @@
 
 (compile-module dns)
 (compile-module let-args)
+(compile-module let-keywords)
 (compile-module lru-cache)
 (compile-module quoted-printable)
 (compile-module hato-base64)
@@ -71,4 +72,5 @@
 (compile-module hato-filter-env)
 
 (compile-executable hato-fetch)
+(compile-executable hato-httpd)
 

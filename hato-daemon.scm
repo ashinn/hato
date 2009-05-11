@@ -5,14 +5,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use extras posix regex tcp tcp-server)
+(require-library extras posix regex tcp tcp-server let-keywords)
 
 (module hato-daemon
-  (running-process-id? daemonize daemon-kill)
+(pid->cmdline running-process-id? run-tcp-server daemonize daemon-kill)
 
-(import scheme chicken extras ports posix regex foreign srfi-18 tcp tcp-server)
+(import scheme chicken extras ports)
+(import posix regex foreign srfi-18 tcp let-keywords)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; process utils
 
 (eval-when (compile)
   (if (file-exists? "/proc/1/cmdline")
@@ -28,8 +30,7 @@
   (define (pid->cmdline pid)
     (condition-case
         (let ((file (process-id-cmdline-file pid)))
-          (and (file-exists? file)
-               (with-input-from-file file read-line)))
+          (with-input-from-file file read-line))
       (exn () #f))))
 
  (else
@@ -41,10 +42,10 @@
   (define pid->cmdline
     (foreign-lambda* c-string ((int pid))
       "unsigned long reslen = sizeof(struct kinfo_proc);
-       struct kinfo_proc* res = malloc(reslen);
+       struct kinfo_proc res;
        int name[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, pid};
-       if (sysctl(name, 4, res, &reslen, NULL, 0) >= 0) {
-         C_return(res->kp_proc.p_comm);
+       if (sysctl(name, 4, &res, &reslen, NULL, 0) >= 0) {
+         C_return(res.kp_proc.p_comm);
        } else {
          C_return(NULL);
        }"))
@@ -59,107 +60,168 @@
                  (string-search (car o) cmdline))))
     (exn () #t)))
 
-(define (daemon-kill pid-file
-                     #!key
-                     (name #f)
-                     (notifier (lambda o #f))
-                     (warner notifier)
-                     (wait-limit 5))
-  (let ((pid (and (file-exists? pid-file)
-                  (condition-case
-                      (call-with-input-file pid-file read)
-                    (exn () #f)))))
-    (cond
-     ((and (number? pid) (running-process-id? pid name))
-      ;; kill the process
-      (notifier "shutting down server with PID: ~A from PID ~A"
-                pid (current-process-id))
-      (condition-case
-          (process-signal pid)
-        (exn ()
-             (warner "couldn't SIGTERM process ~A, trying SIGKILL" pid)
-             (condition-case
-                 (process-signal pid signal/kill)
-               (exn () (warner "couldn't SIGKILL process")))))
-      ;; maybe clean up the pid file
-      (let lp ((i 1))
-        (if (file-exists? pid-file)
-            (cond
-             ((> i wait-limit)
-              (warner "couldn't delete pid-file ~A" pid-file))
-             ((not (running-process-id? pid name))
-              (condition-case (delete-file pid-file)
-                (exn () (warner "error deleting pid-file ~A" pid-file))))
-             (else
-              (thread-sleep! (* i 0.5))
-              (lp (+ i 1)))))))
-     ((number? pid)
-      (notifier "removing stale lock file for pid ~A" pid)
-      (condition-case (delete-file pid-file)
-        (exn ()
-             (warner "couldn't remove stale lock file: ~A"
-                     (call-with-output-string
-                       (lambda (out)
-                         (print-error-message exn out "")))))))
-     (else
-      (warner "no process to kill")))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tcp utils
 
-(define (daemonize #!key name pid-file user-id group-id
-                   running-handler stale-handler invalid-handler
-                   root-thunk init-thunk tcp-port tcp-backlog tcp-host
-                   tcp-handler tcp-max-requests tcp-debug?)
+(define default-max-requests 10000)
 
-  ;; verify there's no process already running
-  (if (and pid-file (file-exists? pid-file))
-      (let ((pid (string->number (call-with-input-file pid-file read-line))))
+(define (run-tcp-server listener-or-port handler . o)
+  (let ((listener (if (integer? listener-or-port)
+                      (tcp-listen listener-or-port)
+                      listener-or-port)))
+    (let-keywords* o
+        ((max-requests default-max-requests)
+         (accept tcp-accept)
+         (debug #f)
+         (log-error
+          (lambda (msg . args) (apply fprintf (current-error-port) msg args))))
+      (define log-debug
+        (if (and debug (not (procedure? debug)))
+            (lambda (msg . args) (apply fprintf (current-error-port) msg args))
+            debug))
+      (define run
+        (if log-debug
+            (lambda (count)
+              (log-debug "tcp-server: accepting request ~S from thread ~S\n"
+                         count (thread-name (current-thread)))
+              (handler)
+              (log-debug "tcp-server: finished ~S\n"
+                         count (thread-name (current-thread))))
+            (lambda (count) (handler))))
+      (let serve ((count 0))
         (cond
-         ((not (number? pid))
-          (if invalid-handler
-              (invalid-handler)
-              (error "invalid pid file" pid-file)))
-         ((running-process-id? pid name)
-          (if running-handler
-              (running-handler)
-              (error "process already running" pid)))
+         ((<= max-requests 0)
+          (thread-yield!))
          (else
-          (if stale-handler
-              (stale-handler)
-              (error "stale pid file" pid-file))))))
+          (receive (in out) (accept listener)
+            (thread-start!
+             (make-thread
+              (lambda ()
+                (set! max-requests (- max-requests 1))
+                (current-input-port in)
+                (current-output-port out)
+                (condition-case (run count)
+                  (exn ()
+                       (cond
+                        (log-error
+                         (log-error "tcp-server: error in thread ~S: ~A\n"
+                                    (thread-name (current-thread))
+                                    (with-output-to-string
+                                      (lambda () (print-error-message exn))))
+                         (print-call-chain (current-error-port))))))
+                (close-input-port in)
+                (close-output-port out)
+                (set! max-requests (+ max-requests 1))))))
+          (serve (+ count 1))))))))
 
-  ;; fork the process and create a new session
-  (if (zero? (process-fork))
-      (create-session)
-      (exit 0))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; daemons
 
-  ;; bind the tcp port and do anything needed as root
-  (if root-thunk (root-thunk))
-  (let ((listener (and tcp-port
-                       (tcp-listen tcp-port (or tcp-backlog 4) tcp-host))))
+(define (daemonize . o)
 
-    ;; now switch the user and group
-    (cond
-     ((zero? (current-user-id))
-      (if group-id (set! (current-group-id) group-id))
-      (if user-id (set! (current-user-id) user-id))))
+  (let-keywords* o
+      (name pid-file user-id group-id
+       running-handler stale-handler invalid-handler
+       root-thunk init-thunk tcp-port tcp-backlog tcp-host
+       tcp-handler tcp-max-requests tcp-debug?)
 
-    ;; log the pid file
-    (if pid-file
-        (call-with-output-file pid-file
-          (lambda (out) (write (current-process-id) out))))
+    ;; verify there's no process already running
+    (if (and pid-file (file-exists? pid-file))
+        (let ((pid (string->number (call-with-input-file pid-file read-line))))
+          (cond
+           ((not (integer? pid))
+            (if invalid-handler
+                (invalid-handler)
+                (error "invalid pid file" pid-file)))
+           ((running-process-id? pid name)
+            (if running-handler
+                (running-handler)
+                (error "process already running" pid)))
+           (else
+            (if stale-handler
+                (stale-handler)
+                ;;(error "stale pid file" pid-file)
+                (delete-file pid-file))))))
 
-    ;; run any inits
-    (if init-thunk (init-thunk))
+    ;; fork the process and create a new session
+    (if (zero? (process-fork))
+        (create-session)
+        (exit 0))
 
-    ;; maybe run the tcp-server
-    (cond
-     (tcp-handler
-      (if listener
-          ((make-tcp-server listener tcp-handler (or tcp-max-requests 100))
-           tcp-debug?)
-          (if tcp-port
-              (error "couldn't bind to port" tcp-port)
-              (error "tcp-handler requires a tcp-port argument"))))
-     ;; just return the listener if a handler isn't specified
-     (listener))))
+    ;; bind the tcp port and do anything needed as root
+    (if root-thunk (root-thunk))
+    (let ((listener (and tcp-port
+                         (tcp-listen tcp-port (or tcp-backlog 4) tcp-host))))
+
+      ;; now switch the user and group
+      (cond
+       ((zero? (current-user-id))
+        (if group-id (set! (current-group-id) group-id))
+        (if user-id (set! (current-user-id) user-id))))
+
+      ;; log the pid file
+      (if pid-file
+          (call-with-output-file pid-file
+            (lambda (out) (write (current-process-id) out))))
+
+      ;; run any inits
+      (if init-thunk (init-thunk))
+
+      ;; maybe run the tcp-server
+      (cond
+       (tcp-handler
+        (if listener
+            (run-tcp-server listener tcp-handler
+                            'max-requests: tcp-max-requests
+                            'debug: tcp-debug?)
+            (if tcp-port
+                (error "couldn't bind to port" tcp-port)
+                (error "tcp-handler requires a tcp-port argument"))))
+       ;; just return the listener if a handler isn't specified
+       (listener)))))
+
+(define (daemon-kill pid-file . o)
+  (let-keywords* o ((name #f)
+                    (notifier (lambda o #f))
+                    (warner notifier)
+                    (wait-limit 5))
+    (let ((pid (and (file-exists? pid-file)
+                    (condition-case
+                        (call-with-input-file pid-file read)
+                      (exn () #f)))))
+      (cond
+       ((and (number? pid) (running-process-id? pid name))
+        ;; kill the process
+        (notifier "shutting down server with PID: ~A from PID ~A"
+                  pid (current-process-id))
+        (condition-case
+            (process-signal pid)
+          (exn ()
+               (warner "couldn't SIGTERM process ~A, trying SIGKILL" pid)
+               (condition-case
+                   (process-signal pid signal/kill)
+                 (exn () (warner "couldn't SIGKILL process")))))
+        ;; maybe clean up the pid file if the killed process didn't
+        (let lp ((i 1))
+          (if (file-exists? pid-file)
+              (cond
+               ((> i wait-limit)
+                (warner "couldn't delete pid-file ~A" pid-file))
+               ((not (running-process-id? pid name))
+                (condition-case (delete-file pid-file)
+                  (exn () (warner "error deleting pid-file ~A" pid-file))))
+               (else
+                (thread-sleep! (* i 0.5))
+                (lp (+ i 1)))))))
+       ((number? pid)
+        (notifier "removing stale lock file for pid ~A" pid)
+        (condition-case (delete-file pid-file)
+          (exn ()
+               (warner "couldn't remove stale lock file: ~A"
+                       (call-with-output-string
+                        (lambda (out)
+                          (print-error-message exn out "")))))))
+       (else
+        (warner "no process to kill"))))))
 
 )

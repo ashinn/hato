@@ -1,18 +1,17 @@
 #!/usr/local/bin/csi -script
 ;;;; hato-cat.scm -- decode messages
 ;;
-;; Copyright (c) 2008 Alex Shinn.  All rights reserved.
+;; Copyright (c) 2008-2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(include "let-args.scm")
-(use numbers posix gdbm extras utils regex srfi-1 srfi-13
+(use let-args numbers posix extras utils regex srfi-1 srfi-13
      hato-archive hato-uri hato-mime hato-date)
 
 (define *program-name* "hato-cat")
-(define-macro (read-version)
-  (call-with-input-file "VERSION" read-line))
+(define-syntax read-version
+  (er-macro-transformer (lambda _ (call-with-input-file "VERSION" read-line))))
 (define *program-version* (read-version))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -38,15 +37,15 @@
       (let ((headers (mime-headers->list in)))
         (mime-message-fold
          in
-         headers
-         (lambda (h b a)
+         (lambda (ph h b a)
            (for-each
             (lambda (e)
               (cond ((mime-ref h e)
                      => (lambda (v) (print (string-titlecase e) ": " v)))))
             extract)
-           (print b))
-         #f)
+           (print b)
+           '())
+         '())
         (newline)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

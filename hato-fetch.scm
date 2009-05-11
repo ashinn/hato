@@ -16,7 +16,7 @@
                 gcd lcm positive? negative? odd? even? zero? exact? inexact?
                 floor ceiling truncate round inexact->exact exact->inexact
                 number? complex? real? rational? integer? real-part imag-part
-                magnitude))
+                magnitude string->list))
 (import (except chicken add1 sub1 signum bitwise-and bitwise-ior bitwise-xor
                 bitwise-not arithmetic-shift))
 (import (except extras random randomize))
@@ -1340,7 +1340,7 @@ Options:
                              (if (conf-get config 'debug?) 7 6))))
           (if (and (integer? log-level) (<= 1 log-level 10))
               (set! current-log-level log-level)))
-        (log-notice "config: ~S" config)
+        ;;(log-notice "config: ~S" config) ;; careful, logs passwords
 
         ;; warn users about bad config entries
         (conf-verify
@@ -1390,13 +1390,13 @@ Options:
 
          (kill?
           (daemon-kill pid-file
-                       name: "hato-fetch"
-                       notifier: (lambda (fmt . args)
-                                   (if (>= current-log-level 5)
-                                       (apply log-format 'notify fmt args)))
-                       warner: (lambda (fmt . args)
-                                 (if (>= current-log-level 4)
-                                     (apply log-format 'warn fmt args)))))
+                       'name: "hato-fetch"
+                       'notifier: (lambda (fmt . args)
+                                    (if (>= current-log-level 5)
+                                        (apply log-format 'notify fmt args)))
+                       'warner: (lambda (fmt . args)
+                                  (if (>= current-log-level 4)
+                                      (apply log-format 'warn fmt args)))))
 
          (fetch?
           (let ((pid (condition-case (call-with-input-file pid-file read)
@@ -1454,7 +1454,7 @@ Options:
              (daemon?
               (cond
                ((not running?)
-                (daemonize name: "hato-fetch" pid-file: pid-file)
+                (daemonize 'name: "hato-fetch" 'pid-file: pid-file)
                 (if (and (output-port? current-log-port)
                          (port-open? current-log-port))
                     (current-error-port current-log-port))))

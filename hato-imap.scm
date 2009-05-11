@@ -826,10 +826,8 @@
 (define imap-fetch-fold/uid
   (imap-reconnect-wrapper
    (lambda (imap what kons . o)
-     (fprintf (current-error-port) "imap-fetch-fold/uid ~S\n" what)
      (let ((set (imap-message-set/uid imap what))
            (knil (if (pair? o) (car o) '())))
-       (fprintf (current-error-port) "knil: ~S\n" knil)
        (if (or (not set) (null? set))
            knil
            (imap-get-response

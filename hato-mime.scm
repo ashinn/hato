@@ -65,14 +65,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(require-library hato-base64 quoted-printable charconv)
+(require-library hato-base64 quoted-printable charconv utils)
 
 (module hato-mime
   (mime-ref assoc-ref mime-header-fold mime-headers->list
    mime-parse-content-type mime-decode-header
    mime-message-fold)
 
-(import scheme chicken extras ports data-structures)
+(import scheme chicken extras ports data-structures utils)
 (import hato-base64 quoted-printable charconv)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -286,7 +286,7 @@
 
 (define (mime-read-to-boundary port boundary)
   (let ((done? (if boundary
-                   (cut equal? <> boundary)
+                   (lambda (line) (equal? line boundary))
                    (lambda (s) (and (> (string-length s) 4)
                                (string=? "From " (substring s 0 5)))))))
     (let lp ((res '()))
@@ -315,16 +315,17 @@
                         (lambda (headers seed) '()))
                        (kons-end
                         (lambda (headers parent-seed seed)
-                          `((mime (@ ,@headers) ,@(reverse seed))
+                          `((mime (@ ,@headers)
+                                  ,@(if (pair? seed) (reverse seed) seed))
                             ,@parent-seed)))
-                       (headers
-                        (if (pair? o) (car o) (mime-headers->list port))))
+                       (headers (mime-headers->list port)))
       (let tfold ((parent-headers '())
                   (headers headers)
-                  (seed init-seed))
+                  (seed init-seed)
+                  (boundary #f))
         (let* ((ctype (mime-parse-content-type
                        (mime-ref headers "Content-Type" "text/plain")))
-               (type (caar ctype))
+               (type (string-trim-white-space (caar ctype)))
                (enc (string-trim-white-space
                      (or (mime-ref ctype "charset")
                          (mime-ref headers "charset" "ASCII"))))
@@ -333,18 +334,18 @@
                          (mime-ref headers "Encoding" "7-bit")))))
           (cond
            ((and (substring-ci=? type "multipart/")
-                 (mime-ref type "boundary"))
+                 (mime-ref ctype "boundary"))
             => (lambda (boundary)
-                 (mime-read-to-boundary port boundary)
-                 (let lp ((part-seed (kons-start headers seed)))
-                   (let ((part-headers (mime-headers->list port)))
-                     (if (null? part-headers)
-                         (kons-end headers seed part-seed)
-                         (let ((part (mime-read-part port cte enc boundary)))
-                           (lp (tfold parent-headers part-headers part-seed))
-                           ))))))
+                 (let ((boundary (string-append "--" boundary)))
+                   (mime-read-to-boundary port boundary)
+                   (let lp ((part-seed (kons-start headers seed)))
+                     (let ((part-headers (mime-headers->list port)))
+                       (if (null? part-headers)
+                           (kons-end headers seed part-seed)
+                           (lp (tfold parent-headers part-headers
+                                      part-seed boundary))))))))
            (else
-            (let ((body (mime-read-part port cte enc #f)))
+            (let ((body (mime-read-part port cte enc boundary)))
               (kons parent-headers headers body seed)))))))))
 
 ;; (mime (@ (header . value) ...) parts ...)

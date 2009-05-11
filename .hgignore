@@ -11,6 +11,9 @@ manual/hato-manual-Z-A.scm
 hato-mta
 hato-fetch
 hato-classify
+hato-cat
+hato-grep
+hato-httpd
 
 syntax: regexp
 (^|/)roots/[^/]*/root/(var|home)($|/)
