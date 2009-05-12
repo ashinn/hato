@@ -70,7 +70,7 @@
 (module hato-mime
   (mime-ref assoc-ref mime-header-fold mime-headers->list
    mime-parse-content-type mime-decode-header
-   mime-message-fold)
+   mime-message-fold mime-message->sxml)
 
 (import scheme chicken extras ports data-structures utils)
 (import hato-base64 quoted-printable charconv)
@@ -284,27 +284,35 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; message parsing
 
-(define (mime-read-to-boundary port boundary)
-  (let ((done? (if boundary
-                   (lambda (line) (equal? line boundary))
-                   (lambda (s) (and (> (string-length s) 4)
-                               (string=? "From " (substring s 0 5)))))))
+(define (mime-read-to-boundary port boundary next final)
+  (let ((final-boundary (and boundary (string-append boundary "--"))))
     (let lp ((res '()))
       (let ((line (read-line port)))
-        (if (or (eof-object? line) (done? line))
-            (string-intersperse (reverse res)
-                                (with-output-to-string newline))
-            (lp (cons line res)))))))
+        (cond
+         ((or (eof-object? line) (equal? line final-boundary))
+          (final (string-intersperse (reverse res)
+                                     (with-output-to-string newline))))
+         ((equal? line boundary)
+          (next (string-intersperse (reverse res)
+                                    (with-output-to-string newline))))
+         (else
+          (lp (cons line res))))))))
 
-(define (mime-read-part port cte enc boundary)
-  (let ((str (mime-read-to-boundary port boundary)))
-    (cond
-      ((substring-ci=? cte "quoted-printable")
-       (ces-convert (quoted-printable-decode-string str) enc))
-      ((substring-ci=? cte "base64")
-       (ces-convert (base64-decode-string str) enc))
-      (else
-       (ces-convert str enc)))))
+(define (mime-convert-part str cte enc)
+  (ces-convert
+   (cond
+    ((substring-ci=? cte "quoted-printable")
+     (quoted-printable-decode-string str))
+    ((substring-ci=? cte "base64")
+     (base64-decode-string str))
+    (else
+     str))
+   enc))
+
+(define (mime-read-part port cte enc boundary next final)
+  (mime-read-to-boundary port boundary
+                         (lambda (x) (next (mime-convert-part x cte enc)))
+                         (lambda (x) (final (mime-convert-part x cte enc)))))
 
 ;; (kons parent-headers part-headers part-body seed)
 ;; (start headers seed)
@@ -315,14 +323,16 @@
                         (lambda (headers seed) '()))
                        (kons-end
                         (lambda (headers parent-seed seed)
-                          `((mime (@ ,@headers)
+                          `((mime (^ ,@headers)
                                   ,@(if (pair? seed) (reverse seed) seed))
                             ,@parent-seed)))
                        (headers (mime-headers->list port)))
       (let tfold ((parent-headers '())
                   (headers headers)
                   (seed init-seed)
-                  (boundary #f))
+                  (boundary #f)
+                  (next (lambda (x) x))
+                  (final (lambda (x) x)))
         (let* ((ctype (mime-parse-content-type
                        (mime-ref headers "Content-Type" "text/plain")))
                (type (string-trim-white-space (caar ctype)))
@@ -335,23 +345,35 @@
           (cond
            ((and (substring-ci=? type "multipart/")
                  (mime-ref ctype "boundary"))
-            => (lambda (boundary)
-                 (let ((boundary (string-append "--" boundary)))
-                   (mime-read-to-boundary port boundary)
+            => (lambda (boundary2)
+                 (let ((boundary2 (string-append "--" boundary2)))
+                   ;; skip preamble
+                   (mime-read-to-boundary port boundary2 (lambda (x) x) (lambda (x) x))
                    (let lp ((part-seed (kons-start headers seed)))
                      (let ((part-headers (mime-headers->list port)))
-                       (if (null? part-headers)
-                           (kons-end headers seed part-seed)
-                           (lp (tfold parent-headers part-headers
-                                      part-seed boundary))))))))
+                       (tfold parent-headers part-headers
+                              part-seed boundary2
+                              lp
+                              (lambda (x)
+                                ;; skip epilogue
+                                (if boundary
+                                    (mime-read-to-boundary port boundary
+                                                           (lambda (x) x) (lambda (x) x)))
+                                (next (kons-end headers seed x)))
+                              ))))))
            (else
-            (let ((body (mime-read-part port cte enc boundary)))
-              (kons parent-headers headers body seed)))))))))
+            (mime-read-part
+             port cte enc boundary
+             (lambda (x) (next (kons parent-headers headers x seed)))
+             (lambda (x) (final (kons parent-headers headers x seed)))))))))))
 
-;; (mime (@ (header . value) ...) parts ...)
+;; (mime (^ (header . value) ...) parts ...)
 (define (mime-message->sxml . o)
-  (mime-message-fold
-   (if (pair? o) (car o) (current-input-port))
-   (lambda (parent-headers headers body seed) (cons body seed))))
+  (car
+   (mime-message-fold
+    (if (pair? o) (car o) (current-input-port))
+    (lambda (parent-headers headers body seed)
+      `((mime (^ ,@headers) ,body) ,@seed))
+    '())))
 
 )

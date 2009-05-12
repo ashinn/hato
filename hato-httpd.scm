@@ -143,20 +143,43 @@
          (http-respond 400 "Bad Request" '())
          (log-error "unknown method: ~S" request))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (show-help . o)
+  (display "usage: ") (display *program-name*) (display "[options ...]\n")
+  (display
+"
+ -h, --help            print this message
+ -V, --version         print version number
+ -c, --config=<file>   specify config file
+     --no-config       don't load any config file
+ -r, --root=<dir>      specify document root (default `pwd`/www)
+ -p, --port=<num>      specify TCP port to listen on (default 5555)
+ -u, --user=<id>       specify user to run as
+ -g, --group=<id>      specify group to run as
+ -d, --debug           debug run, don't detach
+ -k, --kill            kill a running process
+"))
+
+(define (show-version . o)
+  (display *program-name*) (display " ")
+  (display *program-version*) (newline))
+
 (define (main args)
   (let-args args
-      (;;(help "help|h" => show-help)
-       ;;(version "version|V" => show-version)
-       (name "name=s" "karasu")
+      ((name "name=s" *program-name*)
+       (help "help|h" => show-help)
+       (version "version|V" => show-version)
        (confdir "config-dir=s"
                 (or (getenv "HTTP_CONF_DIR")
                     (if (zero? (current-user-id))
                         (string-append "/etc/" name)
                         (string-append (getenv "HOME") "/" name))))
        (rcfile "config|c=s" (string-append confdir "/httpd.config"))
-       (port "port|p")
-       (user-id "user|u")
-       (group-id "group|g")
+       (docroot "root|r=s")
+       (port "port|p=i")
+       (user "user|u=s")
+       (group "group|g=s")
        (norc? "no-config")
        (debug? "debug|d")
        (kill? "kill|k")
@@ -166,8 +189,15 @@
              (filter
               (lambda (x) (cadr x))
               `((debug? ,debug?)
-                (user-id ,user-id)
-                (group-id ,group-id)
+                (user-id
+                 ,(and user (or (string->number user)
+                                (cond ((user-information user) => caddr)
+                                      (else #f)))))
+                (group-id
+                 ,(and group (or (string->number group)
+                                (cond ((group-information group) => caddr)
+                                      (else #f)))))
+                (document-root ,docroot)
                 (port ,port)))
              (if (and (not norc?) (file-exists? rcfile))
                  (conf-load rcfile) 
