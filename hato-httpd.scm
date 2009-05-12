@@ -217,7 +217,7 @@
        (debug?
         ((make-http-handler config)))
        (else
-        (daemonize 'name: "karasu"
+        (daemonize 'name: name
                    'pid-file: pid-file
                    'tcp-port: (conf-get config 'port 5555)
                    'user-id: (conf-get config 'user-id)
