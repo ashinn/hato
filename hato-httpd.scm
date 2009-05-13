@@ -3,14 +3,14 @@
 ;; Copyright (c) 2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-(require-library srfi-1 srfi-13 srfi-69 sendfile)
-(require-library let-args hato-config hato-log hato-daemon hato-mime)
+(require-library srfi-1 srfi-13 srfi-69 tcp matchable sendfile)
+(require-library let-args hato-config hato-utils hato-log hato-daemon hato-mime)
 
 (module hato-httpd (main)
 
 (import scheme chicken extras ports regex posix files data-structures)
-(import srfi-1 srfi-13 srfi-69)
-(import sendfile let-args hato-config hato-log hato-daemon hato-mime)
+(import srfi-1 srfi-13 srfi-69 tcp matchable sendfile)
+(import let-args hato-config hato-utils hato-log hato-daemon hato-mime)
 
 (define-logger (current-log-level set-current-log-level! info)
   (log-emergency log-alert log-critical log-error
@@ -24,7 +24,7 @@
 
 (define (http-parse-request . o)
   (let ((line (string-split
-               (read-line (if (pair? o) (car o) (current-input-port))))))
+               (read-line (if (pair? o) (car o) (current-input-port)) 4096))))
     (cons (string->symbol (car line)) (cdr line))))
 
 (define (http-respond status msg headers)
@@ -98,26 +98,74 @@
 (define (http-send-directory dir request headers config)
   (http-respond 200 "OK" (append (http-base-headers config)
                                  '((Content-Type . "text/html"))))
-  (display "<html><body bgcolor=white><ul>\n")
+  (display "<html><body bgcolor=white><pre>\n")
   (for-each
-   (lambda (file) (print "<li><a href=\"" dir "/" file "\">" file "</a>"))
+   (lambda (file) (print "<a href=\"" dir "/" file "\">" file "</a>"))
    (directory dir))
-  (display "</ul></body></html>\n"))
+  (display "</pre></body></html>\n"))
 
-;; 0) sanity checks
-;; 1) dispatch on rewrite rules
-;; 2) determine actual file in virtual directory
-;; 3) verify permissions
-;; 4) allow additional rewrite rules (goto 1 on rewrite)
-;; 5) determine handler from vdir, extension
-;; 6) call handler (plain file, cgi, scheme, directory, etc.)
+(define (char-uri? ch)
+  #t)
+
+(define (string-match-substitute m subst str)
+  str)
+
 (define (http-handle-get request headers config)
-  (let* ((file (cadr request))
-         (vfile (http-resolve-file file request headers config)))
-    (log-notice "get ~S" vfile)
-    (if (directory? vfile)
-        (http-send-directory vfile request headers config)
-        (http-send-file vfile request headers config))))
+  (let ((path (cadr request)))
+    (cond
+     ;; 0) sanity checks
+     ((> (string-length path) 4096)
+      (log-warn "long request: ~S" (substring path 0 4096))
+      (http-respond 414 "Request-URI Too Long" '()))
+     ((not (string-every char-uri? path))
+      (log-warn "bad request: ~S" path)
+      (http-respond 400 "Bad Request" '()))
+     ;; 1) dispatch on rewrite rules
+     ((find (lambda (x) (cond ((string-match (car x) path)
+                          => (lambda (m) (list x m)))
+                         (else #f)))
+            (conf-multi config 'rewrite))
+      => (match-lambda
+             (((rx subst . flags) m)
+              (let ((new-path (string-match-substitute m subst path)))
+                (cond
+                 ((memq 'redirect flags)
+                  (log-notice "redirecting => ~S" new-path)
+                  (http-respond 302 "Moved Temporarily"
+                                `((Location . ,new-path))))
+                 (else
+                  (http-handle-get (cons (car request) new-path (cddr request))
+                                   headers
+                                   config)))))))
+     (else
+      ;; 2) determine actual file in virtual directory
+      (let ((vfile (http-resolve-file path request headers config)))
+        (log-notice "GET ~S ~S" vfile headers)
+        (let ((config (condition-case
+                          (conf-load
+                           (string-append (pathname-directory vfile) "/.config")
+                           config)
+                        (exn () config))))
+          ;; 3) verify permissions
+          (cond
+           (#f
+            (log-warn "no permissions")
+            (http-respond 401 "Unauthorized" '()))
+           ;; 4) determine handler from vdir, extension
+           (else
+            (if (directory? vfile)
+                (http-send-directory vfile request headers config)
+                (case (assoc-ref (conf-multi config 'handlers)
+                                 (pathname-extension vfile))
+                  ((private)
+                   (log-warn "trying to access private file: ~S" vfile)
+                   (http-respond 404 "Not Found" '()))
+                  ((scheme)
+                   ((load-scheme-script vfile) request headers config))
+                  ((cgi)
+                   #f)
+                  (else ; static file
+                   (http-send-file vfile request headers config))))))))))))
 
 (define (http-handle-head request headers config)
   #f)
@@ -125,23 +173,35 @@
 (define (http-handle-post request headers config)
   #f)
 
+(define (black-listed? ipaddr config)
+  (assoc ipaddr (conf-multi config 'black-list)))
+
+(define (load-scheme-script path)
+  #f)
+
 (define (make-http-handler config)
   (lambda ()
-    (let* ((request (http-parse-request))
-           (headers (mime-headers->list))
-           (server (mime-ref headers "Server"))
-           (vconfig (cond
-                     ((and server
-                           (assoc-ref (conf-get-alist config '()) server))
-                      => (lambda (x) (conf-extend x config)))
-                     (else config))))
-      (case (car request)
-        ((GET)  (http-handle-get request headers vconfig))
-        ((HEAD) (http-handle-head request headers vconfig))
-        ((POST) (http-handle-post request headers vconfig))
-        (else
-         (http-respond 400 "Bad Request" '())
-         (log-error "unknown method: ~S" request))))))
+    (receive (local remote) (tcp-addresses (current-input-port))
+      (cond
+       ((black-listed? remote config)
+        (log-warn "black-listed: ~S" remote)
+        (http-respond 401 "Unauthorized" '()))
+       (else
+        (let* ((request (http-parse-request))
+               (headers (mime-headers->list (current-input-port) 128))
+               (server (mime-ref headers "Server"))
+               (vconfig (cond
+                         ((and server
+                               (assoc-ref (conf-get-alist config '()) server))
+                          => (lambda (x) (conf-extend x config)))
+                         (else config))))
+          (case (car request)
+            ((GET)  (http-handle-get request headers vconfig))
+            ((HEAD) (http-handle-head request headers vconfig))
+            ((POST) (http-handle-post request headers vconfig))
+            (else
+             (log-error "unknown method: ~S" request)
+             (http-respond 400 "Bad Request" '())))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

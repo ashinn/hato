@@ -6,7 +6,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; RFC2822 headers
 
-;; Procedure: mime-header-fold kons knil [source kons-from]
+;; Procedure: mime-header-fold kons knil [source [limit [kons-from]]]
 ;;
 ;;  Performs a fold operation on the MIME headers of source which can be
 ;;  either a string or port, and defaults to current-input-port.  kons
@@ -20,6 +20,8 @@
 ;;  enable this procedure to be used as-is on mbox files and the like.
 ;;  It defaults to KONS, and if such a line is found the fold will begin
 ;;  with (KONS-FROM "%from" <address> (KONS-FROM "%date" <date> KNIL)).
+;;
+;; The optional LIMIT gives a limit on the number of headers to read.
 
 ;; Procedure: mime-headers->list [source]
 ;;   Return an alist of the MIME headers from source with headers all
@@ -74,6 +76,8 @@
 
 (import scheme chicken extras ports data-structures utils)
 (import hato-base64 quoted-printable charconv)
+
+(define-constant mime-line-length-limit 4096)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; warn on invalid headers in debug mode
@@ -136,9 +140,19 @@
                   (else
                    best)))))))
 
+(define (string-skip-white-space str i)
+  (let ((lim (string-length str)))
+    (let lp ((i i))
+      (cond ((>= i lim) lim)
+            ((char-whitespace? (string-ref str i)) (lp (+ i 1)))
+            (else i)))))
+
 (define (match-mime-header-line line)
   (let ((i (string-scan-colon-or-maybe-equal line)))
-    (and i (list (substring line 0 i) (substring line (+ i 1))))))
+    (and i
+         (let ((j (string-skip-white-space line (+ i 1))))
+           (list (substring line 0 i)
+                 (substring line j))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some srfi-13 & string utils
@@ -186,7 +200,7 @@
             ((char-whitespace? (string-ref s i)) (lp (+ i 1)))
             (else
              (let lp ((j (- len 1)))
-               (cond ((<= j i) (substring s i (+ j 1)))
+               (cond ((<= j i) "")
                      ((char-whitespace? (string-ref s j)) (lp (- j 1)))
                      (else (substring s i (+ j 1))))))))))
 
@@ -194,53 +208,57 @@
 ;; header parsing
 
 (define (mime-header-fold kons knil . o)
-  (let-optionals* o ((src #f) (kons-from kons))
+  (let-optionals* o ((src #f) (limit #f) (kons-from kons))
     ((if (string? src) mime-header-fold-string mime-header-fold-port)
-     kons knil (or src (current-input-port)) kons-from)))
+     kons knil (or src (current-input-port)) limit kons-from)))
 
-(define (mime-header-fold-string kons knil str kons-from)
+(define (mime-header-fold-string kons knil str limit kons-from)
   (call-with-input-string str
-    (cut mime-header-fold-port kons knil <> kons-from)))
+    (lambda (in) (mime-header-fold-port kons knil in limit kons-from))))
 
-(define (mime-header-fold-port kons knil port kons-from)
-  (define (out line acc)
+(define (mime-header-fold-port kons knil port limit kons-from)
+  (define (out line acc count)
     (cond
-      ((or (eof-object? line) (string=? line ""))
-       acc)
-      ((match-mime-header-line line)
-       => (lambda (m)
-            (in (car m) (list (cadr m)) acc)))
-      (else
-       (warn "invalid header line: ~S\n" line)
-       (out (read-line port) acc))))
-  (define (in header value acc)
-    (let ((line (read-line port)))
+     ((or (and limit (> count limit)) (eof-object? line) (string=? line ""))
+      acc)
+     ((match-mime-header-line line)
+      => (lambda (m) (in (car m) (list (cadr m)) acc (+ count 1))))
+     (else
+      (warn "invalid header line: ~S\n" line)
+      (out (read-line port mime-line-length-limit) acc (+ count 1)))))
+  (define (in header value acc count)
+    (let ((line (read-line port mime-line-length-limit)))
       (cond
-        ((or (eof-object? line) (string=? line ""))
-         (kons header (string-concatenate-reverse value) acc))
-        ((char-whitespace? (string-ref line 0))
-         (in header (cons line value) acc))
-        (else
-         (out line (kons header (string-concatenate-reverse value) acc))))))
-  (let ((first-line (read-line port)))
+       ((and limit (> count limit))
+        acc)
+       ((or (eof-object? line) (string=? line ""))
+        (kons header (string-concatenate-reverse value) acc))
+       ((char-whitespace? (string-ref line 0))
+        (in header (cons line value) acc (+ count 1)))
+       (else
+        (out line
+             (kons header (string-concatenate-reverse value) acc)
+             (+ count 1))))))
+  (let ((first-line (read-line port mime-line-length-limit)))
     (cond
-      ((eof-object? first-line)
-       knil)
-      ((and kons-from (match-mbox-from-line first-line))
-       => (lambda (m) ; special case check on first line for mbox files
-            (out (read-line port)
-                 (kons-from "%from" (car m)
-                       (kons-from "%date" (cadr m) knil)))))
-      (else
-       (out first-line knil)))))
+     ((eof-object? first-line)
+      knil)
+     ((and kons-from (match-mbox-from-line first-line))
+      => (lambda (m) ; special case check on first line for mbox files
+           (out (read-line port mime-line-length-limit)
+                (kons-from "%from" (car m)
+                           (kons-from "%date" (cadr m) knil))
+                0)))
+     (else
+      (out first-line knil 0)))))
 
 (define (mime-headers->list . o)
-  (let ((port (if (pair? o) (car o) (current-input-port))))
-    (reverse
-     (mime-header-fold
-      (lambda (h v acc) (cons (cons (string-downcase h) v) acc))
-      '()
-      port))))
+  (reverse
+   (apply
+    mime-header-fold
+    (lambda (h v acc) (cons (cons (string-downcase h) v) acc))
+    '()
+    o)))
 
 (define (mime-split-name+value s)
   (let ((i (string-char-index s #\=)))
@@ -287,7 +305,7 @@
 (define (mime-read-to-boundary port boundary next final)
   (let ((final-boundary (and boundary (string-append boundary "--"))))
     (let lp ((res '()))
-      (let ((line (read-line port)))
+      (let ((line (read-line port mime-line-length-limit)))
         (cond
          ((or (eof-object? line) (equal? line final-boundary))
           (final (string-intersperse (reverse res)
@@ -299,20 +317,20 @@
           (lp (cons line res))))))))
 
 (define (mime-convert-part str cte enc)
-  (ces-convert
-   (cond
-    ((substring-ci=? cte "quoted-printable")
-     (quoted-printable-decode-string str))
-    ((substring-ci=? cte "base64")
-     (base64-decode-string str))
-    (else
-     str))
-   enc))
+  (let ((str (cond
+              ((and (string? cte) (substring-ci=? cte "quoted-printable"))
+               (quoted-printable-decode-string str))
+              ((and (string? cte) (substring-ci=? cte "base64"))
+               (base64-decode-string str))
+              (else
+               str))))
+    (if (string? enc) (ces-convert str enc) str)))
 
 (define (mime-read-part port cte enc boundary next final)
-  (mime-read-to-boundary port boundary
-                         (lambda (x) (next (mime-convert-part x cte enc)))
-                         (lambda (x) (final (mime-convert-part x cte enc)))))
+  (mime-read-to-boundary
+   port boundary
+   (lambda (x) (next (mime-convert-part x cte enc)))
+   (lambda (x) (final (mime-convert-part x cte enc)))))
 
 ;; (kons parent-headers part-headers part-body seed)
 ;; (start headers seed)

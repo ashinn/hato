@@ -49,10 +49,11 @@
        (if (eqv? #\/ (string-ref file 0)) file (make-pathname dir file))))
     cfg-path)))
 
-(define (conf-load file)
-  (list
+(define (conf-load file . o)
+  (cons
    (parameterize ((case-sensitive #f))
-     (read-from-file file '()))))
+     (read-from-file file '()))
+   (if (pair? o) (car o) '())))
 
 (define (conf-get-cell cfg key)
   (let search ((ls cfg))
