@@ -6,13 +6,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (module hato-uri
-  (uri->string make-uri string->uri
+  (uri->string make-uri string->uri string->path-uri uri?
    uri-scheme uri-user uri-host uri-port
    uri-path uri-query uri-fragment
    uri-with-scheme uri-with-user uri-with-host uri-with-path
    uri-with-query uri-with-fragment uri-with-port
    uri-encode uri-decode
-   uri-query->alist uri-alist->query)
+   uri-query->alist uri-alist->query
+   string-downcase->symbol)
 
 (import scheme chicken data-structures)
 
@@ -30,6 +31,8 @@
   (let-optionals* o ((user #f) (host #f) (port #f)
                      (path #f) (query #f) (fragment #f))
     (list fragment query path port host user scheme)))
+
+(define (uri? x) (and (list? x) (= 7 (length x))))
 
 (define (uri-scheme uri) (caddr (cddddr uri)))
 (define (uri-user uri) (cadr (cddddr uri)))
@@ -120,7 +123,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; parsing - without :// we just split into scheme & path
 
-(define (string->uri str . o)
+(define (string->path-uri scheme str . o)
   (define decode? (and (pair? o) (car o)))
   (define decode (if decode? uri-decode identity))
   (define decode-query
@@ -132,7 +135,16 @@
       (let ((len (string-length str))
             (colon (string-scan str #\:)))
         (if (or (not colon) (zero? colon))
-            #f
+            (and scheme
+                 (let* ((quest (string-scan str #\? 0))
+                        (pound (string-scan str #\# (or quest 0))))
+                   (make-uri scheme #f #f #f
+                             (decode (substring str 0 (or quest pound len)))
+                             (and quest
+                                  (decode-query
+                                   (substring str (+ quest 1) (or pound len))))
+                             (and pound
+                                  (decode (substring str (+ pound 1) len))))))
             (let ((sc1 (+ colon 1))
                   (scheme (string-downcase->symbol (substring str 0 colon))))
               (if (= sc1 len)
@@ -170,6 +182,9 @@
                                     (or colon3 sc3)))
                                   (and at (decode (substring str sc2 at)))
                                   scheme))))))))))
+
+(define (string->uri str . o)
+  (apply string->path-uri #f str o))
 
 (define (uri->string uri . o)
   (define encode? (and (pair? o) (car o)))

@@ -3,14 +3,14 @@
 ;; Copyright (c) 2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-(require-library srfi-1 srfi-13 srfi-69 tcp matchable sendfile)
-(require-library let-args hato-config hato-utils hato-log hato-daemon hato-mime)
+(require-library srfi-1 srfi-13 srfi-69 tcp matchable sendfile let-args)
+(require-library hato-config hato-uri hato-utils hato-log hato-daemon hato-mime)
 
 (module hato-httpd (main)
 
 (import scheme chicken extras ports regex posix files data-structures)
-(import srfi-1 srfi-13 srfi-69 tcp matchable sendfile)
-(import let-args hato-config hato-utils hato-log hato-daemon hato-mime)
+(import srfi-1 srfi-13 srfi-69 tcp matchable sendfile let-args)
+(import hato-config hato-uri hato-utils hato-log hato-daemon hato-mime)
 
 (define-logger (current-log-level set-current-log-level! info)
   (log-emergency log-alert log-critical log-error
@@ -88,14 +88,14 @@
      (else ;; don't provide any more info in this case
       (http-respond 404 "File not found" '())))))
 
-(define (http-document-root file request headers config)
+(define (http-document-root file uri headers config)
   (or (conf-get config 'document-root)
       (string-append (current-directory) "/www")))
 
-(define (http-resolve-file file request headers config)
-  (string-append (http-document-root file request headers config) "/" file))
+(define (http-resolve-file file uri headers config)
+  (string-append (http-document-root file uri headers config) "/" file))
 
-(define (http-send-directory dir request headers config)
+(define (http-send-directory dir uri headers config)
   (http-respond 200 "OK" (append (http-base-headers config)
                                  '((Content-Type . "text/html"))))
   (display "<html><body bgcolor=white><pre>\n")
@@ -105,13 +105,17 @@
   (display "</pre></body></html>\n"))
 
 (define (char-uri? ch)
-  #t)
+  (<= 33 (char->integer ch) 126))
 
 (define (string-match-substitute m subst str)
-  str)
+  (let lp ((ls subst) (res '()))
+    (cond
+     ((null? ls) (string-concatenate-reverse res))
+     ((number? (car ls)) (lp (cdr ls) (cons (list-ref m (car ls)) res)))
+     (else (lp (cdr ls) (cons (car ls) res))))))
 
-(define (http-handle-get request headers config)
-  (let ((path (cadr request)))
+(define (http-handle-get uri headers config vconfig)
+  (let ((path (uri-path uri)))
     (cond
      ;; 0) sanity checks
      ((> (string-length path) 4096)
@@ -134,18 +138,19 @@
                   (http-respond 302 "Moved Temporarily"
                                 `((Location . ,new-path))))
                  (else
-                  (http-handle-get (cons (car request) new-path (cddr request))
-                                   headers
-                                   config)))))))
+                  (http-handle-request (cons 'GET new-path "HTTP/1.1")
+                                       headers ;; XXXX adjust host
+                                       config)))))))
      (else
       ;; 2) determine actual file in virtual directory
-      (let ((vfile (http-resolve-file path request headers config)))
+      (let ((vfile (http-resolve-file path uri headers vconfig)))
         (log-notice "GET ~S ~S" vfile headers)
-        (let ((config (condition-case
-                          (conf-load
-                           (string-append (pathname-directory vfile) "/.config")
-                           config)
-                        (exn () config))))
+        (let ((vconfig (condition-case
+                           (conf-load
+                            (string-append (pathname-directory vfile)
+                                           "/.config")
+                            config)
+                         (exn () vconfig))))
           ;; 3) verify permissions
           (cond
            (#f
@@ -154,23 +159,23 @@
            ;; 4) determine handler from vdir, extension
            (else
             (if (directory? vfile)
-                (http-send-directory vfile request headers config)
+                (http-send-directory vfile uri headers vconfig)
                 (case (assoc-ref (conf-multi config 'handlers)
                                  (pathname-extension vfile))
                   ((private)
                    (log-warn "trying to access private file: ~S" vfile)
                    (http-respond 404 "Not Found" '()))
                   ((scheme)
-                   ((load-scheme-script vfile) request headers config))
+                   ((load-scheme-script vfile) vfile uri headers vconfig))
                   ((cgi)
                    #f)
                   (else ; static file
-                   (http-send-file vfile request headers config))))))))))))
+                   (http-send-file vfile uri headers vconfig))))))))))))
 
-(define (http-handle-head request headers config)
+(define (http-handle-head uri headers config vconfig)
   #f)
 
-(define (http-handle-post request headers config)
+(define (http-handle-post uri headers config vconfig)
   #f)
 
 (define (black-listed? ipaddr config)
@@ -178,6 +183,25 @@
 
 (define (load-scheme-script path)
   #f)
+
+(define (http-handle-request request headers config)
+  (let* ((uri (or (string->path-uri 'http (cadr request))
+                  (make-uri 'http #f #f #f)))
+         (host (cond ((or (and (uri? uri) (uri-host uri))
+                          (mime-ref headers "Host"))
+                      => string-downcase->symbol)
+                     (else #f)))
+         (vconfig (cond
+                   ((assq-ref (conf-multi config 'virtual-hosts) host)
+                    => (lambda (x) (conf-extend x config)))
+                   (else config))))
+    (case (car request)
+      ((GET)  (http-handle-get uri headers config vconfig))
+      ((HEAD) (http-handle-head uri headers config vconfig))
+      ((POST) (http-handle-post uri headers config vconfig))
+      (else
+       (log-error "unknown method: ~S" request)
+       (http-respond 400 "Bad Request" '())))))
 
 (define (make-http-handler config)
   (lambda ()
@@ -188,20 +212,13 @@
         (http-respond 401 "Unauthorized" '()))
        (else
         (let* ((request (http-parse-request))
-               (headers (mime-headers->list (current-input-port) 128))
-               (server (mime-ref headers "Server"))
-               (vconfig (cond
-                         ((and server
-                               (assoc-ref (conf-get-alist config '()) server))
-                          => (lambda (x) (conf-extend x config)))
-                         (else config))))
-          (case (car request)
-            ((GET)  (http-handle-get request headers vconfig))
-            ((HEAD) (http-handle-head request headers vconfig))
-            ((POST) (http-handle-post request headers vconfig))
-            (else
-             (log-error "unknown method: ~S" request)
-             (http-respond 400 "Bad Request" '())))))))))
+               (headers (mime-headers->list (current-input-port) 128)))
+          (cond
+           ((not (= 3 (length request)))
+            (log-error "bad request: ~S" request)
+            (http-respond 400 "Bad Request" '()))
+           (else
+            (http-handle-request request headers config)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
