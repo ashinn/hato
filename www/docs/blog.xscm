@@ -2,8 +2,14 @@
 
 (import extras ports)
 (require-extension
- regex posix hato-uri hato-config hato-http html-parser
+ srfi-1 files regex posix data-structures
+ hato-uri hato-config hato-http html-parser
  wiki-parse wiki-write wiki-utils)
+
+(define (display-timestamp mtime)
+  (display "<small>posted by <a href=\"/wiki/users:foof\">foof</a> on ")
+  (display (seconds->string mtime))
+  (display "</small>\n"))
 
 (define (display-prefix title mtime)
   (display "<html>\n<head>\n<title>")
@@ -16,11 +22,9 @@
 <div id=\"header\">
 <b>")
   (display title)
-  (display "</b><br />
-<small>posted by <a href=\"/wiki/users:foof\">foof</a> on ")
-  (display (seconds->string mtime))
-  (display "</small>
-</div>
+  (display "</b><br />\n")
+  (cond (mtime (display-timestamp mtime)))
+  (display "</div>
 
 <div id=\"search\">
 <form action=\"http://www.google.com/search\">
@@ -34,10 +38,65 @@
 <div id=\"main\">
 "))
 
+(define (display-summary config wdir)
+  (let ((bdir (string-append wdir "/blog/")))
+    (for-each
+     (lambda (year)
+       (let ((ydir (string-append bdir (number->string year))))
+         (for-each
+          (lambda (month)
+            (let ((mdir (string-append ydir "/" (if (< month 10) "0" "")
+                                       (number->string month))))
+              (for-each
+               (lambda (f)
+                 (let ((path (string-append "/blog/"
+                                            (number->string year)
+                                            "/"
+                                            (if (< month 10) "0" "")
+                                            (number->string month)
+                                            "/"
+                                            (pathname-strip-extension f))))
+                   (wiki-write
+                    (list
+                     `(p (a (@ (href ,path)) ,(pathname-strip-extension f))
+                         (br)
+                         (small
+                          "posted by "
+                          (a (@ (href "/wiki/users:foof")) "foof")
+                          " on "
+                          ,(seconds->string
+                            (file-modification-time
+                             (string-append mdir "/" f)))))
+                     (car (get-sxml wdir config (string-append mdir "/" f)))
+                     `(a (@ (href ,path)) "[Read more...]")))))
+               (filter (lambda (f) (equal? "wiki" (pathname-extension f)))
+                       (directory mdir)))))
+          (sort (filter-map string->number (directory ydir)) >))))
+     (sort (filter-map string->number (directory bdir)) >))))
+
 (define (display-suffix) (display "</div>\n\n</body>\n</html>\n"))
 
 (define date-rx
   (regexp "^([0-9][0-9][0-9][0-9]/[0-9][0-9]/)(.+)"))
+
+(define (get-sxml dir config wiki-file)
+  (let* ((cache-file (pathname-replace-extension wiki-file "cache"))
+         (wiki-mtime (file-modification-time wiki-file))
+         (cache-mtime (and (file-exists? cache-file)
+                           (file-modification-time cache-file))))
+    (cond
+     ((or (not cache-mtime) (> wiki-mtime cache-mtime))
+      (let* ((sxml (wiki-sugar (call-with-input-file wiki-file wiki-parse)
+                               dir
+                               (conf-multi config 'wiki-aliases)))
+             (out (open-output-file cache-file))
+             (lock (file-lock out)))
+        (with-output-to-port out (lambda () (write sxml)))
+        (file-unlock lock)
+        (close-output-port out)
+        sxml))
+     (else
+      (call-with-input-file cache-file read)))))
 
 (define (handle path uri headers config)
   (let* ((params (http-parse-form uri headers))
@@ -47,28 +106,15 @@
          (wdir (conf-get config 'wiki-root "www/docs/wiki/"))
          (base (and m (string-append wdir "/blog/" (cadr m)
                                      (wiki-word-encode (caddr m)))))
-         (raw-file (and base (string-append base ".wiki")))
-         (cache-file (and base (string-append base ".sxml"))))
+         (wiki-file (and base (string-append base ".wiki"))))
     (cond
-     ((or (not raw-file) (not (file-exists? raw-file))))
+     ((or (not wiki-file) (not (file-exists? wiki-file)))
+      (display-prefix "synthcode blog" #f)
+      (display-summary config wdir)
+      (display-suffix))
      (else
-      (let* ((raw-mtime (file-modification-time raw-file))
-             (cache-mtime (and (file-exists? cache-file)
-                               (file-modification-time cache-file))))
-        (display-prefix (html-escape title) raw-mtime)
-        (cond
-         ((or (not cache-mtime) (> raw-mtime cache-mtime))
-          (let* ((sxml (wiki-sugar (call-with-input-file raw-file wiki-parse)
-                                   wdir
-                                   (conf-multi config 'wiki-aliases)))
-                 (out (open-output-file cache-file))
-                 (lock (file-lock out))
-                 )
-            (with-output-to-port out (lambda () (write sxml)))
-            (file-unlock lock)
-            (close-output-port out)
-            (wiki-write sxml)))
-         (else
-          (wiki-write (call-with-input-file cache-file read))))
+      (let ((sxml (get-sxml wdir config wiki-file)))
+        (display-prefix (html-escape title) (file-modification-time wiki-file))
+        (wiki-write sxml)
         (display-suffix))))))
 

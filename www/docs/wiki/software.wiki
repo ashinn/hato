@@ -10,12 +10,11 @@ extensions I've written can be found out at
 http://chicken.wiki.br/users/alex-shinn.
 
 * [[scheme-complete]] - intelligent Scheme tab-completion with type-inference for Emacs
-* [[irregex]] - a fully portable and efficient R[456]RS implementation of regular expressions
+* [http://synthcode.com/scheme/irregex/ irregex] - a fully portable and efficient R[456]RS implementation of regular expressions
 * [[chibi-scheme]] - a very tiny Scheme implementation with decent speed and native hygienic macros
-* [[hato]] - a mail suite including [[wp:Mail transfer agent]], fetchmail replacement, multilingual spam classifier, Yahoo domain key verifier and other utilities
-* [[kishi]] - a simple chess program with both [[wp:XBoard]] support and an ASCII interface with optional ANSI graphics and Unicode character chess pieces
-* [[fmt]] - extensible combinator-based text formatting
-* [[match]] - a fully portable hygienic pattern matcher backwards compatible with Andrew Wright's MATCH sytax
-* [[loop]] - a powerful and extensible LOOP syntax in the spirit of named-let
-
+* [http://synthcode.com/scheme/hato/doc/hato-manual.html hato] - a mail suite including [[wp:Mail transfer agent]], fetchmail replacement, multilingual spam classifier, Yahoo domain key verifier and other utilities
+* [http://synthcode.com/scheme/kishi.scm kishi] - a simple chess program with both [[wp:XBoard]] support and an ASCII interface with optional ANSI graphics and Unicode character chess pieces
+* [http://synthcode.com/scheme/fmt/ fmt] - extensible combinator-based text formatting
+* [http://synthcode.com/scheme/match.scm match] - a fully portable hygienic pattern matcher backwards compatible with Andrew Wright's MATCH sytax
+* [http://synthcode.com/scheme/loop.scm loop] - a powerful and extensible LOOP syntax in the spirit of named-let
 

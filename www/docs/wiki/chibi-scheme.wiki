@@ -1,0 +1,33 @@
+Smaller than TinyScheme, faster than a speeding Guile, able to leap
+tall vectors in a single bounds check, with native hygiene to boot!
+
+'''WARNING:''' Do not use Chibi-Scheme!
+
+Seriously, there are real Scheme compilers out there.  The author
+of Chibi-Scheme was working on one himself before starting this
+silly project, and will likely continue to work on it for years to
+come.  But sometimes we all just want to release something.
+
+There seems to be a disturbing trend, however, of people taking
+toy Scheme interpreters seriously.  It can't be for ease of use,
+because the serious compilers all have the most friendly FFI's.
+It can't be for the small memory footprint, because the difference
+between a 100k and 2MB program text will be dwarfed by the runtime
+memory, and all of the real implementations have much more
+efficient memory usage.  But time and again you'll find TinyScheme
+crop in in bizarre places, which leads one to wonder how much of a
+bad name is Scheme getting by being so often represented by one of
+the slowest language implementations on the planet?
+
+So Chibi-Scheme exists as a better toy implementation.  It's a
+very small but mostly complete R5RS Scheme implementation using a
+reasonably fast custom VM.  Chibi-Scheme tries as much as possible
+not to trade its small size by cutting corners, and provides full
+continuations, both low and high-level hygienic macros based on
+syntactic-closures, string ports and exceptions.  It also has
+optional immediate symbols, just to be quirky.
+
+Download: [http://synthcode.com/scheme/chibi-scheme-0.1.tgz version 0.1]
+
+(If the above link is too slow, try http://www.ccil.org/~cowan/chibi-scheme-0.1.tgz.)
+

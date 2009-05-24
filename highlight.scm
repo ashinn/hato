@@ -9,7 +9,13 @@
 
 (define (highlight-detect-language str)
   (cond
-   ((or (string-contains str "(define") (string-contains str "(lambda ("))
+   ((or (string-contains str "(define")
+        (string-contains str "(eval")
+        (string-contains str "(set")
+        (string-contains str "(string")
+        (string-contains str "(let")
+        (string-contains str "(lambda (")
+        )
     'scheme)
    ((string-contains str "\tmovl\t")
     'asm)
@@ -214,7 +220,9 @@
                           (highlight-class 'keyword id out)
                           (highlight (+ n 1)))
                          (else
+                          (display "<span>" out)
                           (display id out)
+                          (display "</span>" out)
                           (highlight (+ n 1)))))))
                  ((#\))
                   (cond

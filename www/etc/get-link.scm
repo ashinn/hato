@@ -235,7 +235,7 @@
         (let lp ((ls (cadr type)))
           (cond ((null? ls))
                 ((eq? ':optional (car ls))
-                 (display "[")
+                 (display " [")
                  (write (cadr ls))
                  (for-each
                   (lambda (x) (display " ") (write x))

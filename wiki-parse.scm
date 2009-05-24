@@ -65,11 +65,13 @@
 
 (define wiki-parse-inline
   (let ((wiki-bold-rx
-         (irregex "\\*([^*]+)\\*"))
+         (irregex "'''([^']+)'''")) ;;"\\*([^*]+)\\*"
         (wiki-italic-rx
-         (irregex "/([^/]+)/"))
+         (irregex "''([^']+)''")) ;;"/([^/]+)/"
         (wiki-uline-rx
-         (irregex "_([^_]+)_"))
+         (irregex "<u>([^<]+)</u>"))
+        (wiki-strike-out-rx
+         (irregex "<s>([^<]+)</s>"))
         (wiki-word-rx
          (irregex "\\[\\[([^\\]|]+)(?:\\| *([^\\]|]+))?\\]\\]"))
         (wiki-note-rx
@@ -108,6 +110,8 @@
           ,(lambda (m) (list 'i (irregex-match-substring m 1))))
          (,wiki-uline-rx
           ,(lambda (m) (list 'u (irregex-match-substring m 1))))
+         (,wiki-strike-out-rx
+          ,(lambda (m) (list 's (irregex-match-substring m 1))))
          )
        str))))
 
@@ -133,14 +137,22 @@
                 ,@res))
              (else
               `((p
-                 ,@(wiki-parse-inline (string-intersperse (reverse par) "\n")))
+                 ,@(reverse (drop-while string? par))
+                 ,@(wiki-parse-inline
+                    (string-intersperse
+                     (reverse (take-while string? par))
+                     "\n")))
                 ,@res))))
           (let ((line (read-line in)))
             (cond
              ((eof-object? line)
               (reverse (collect)))
              ((equal? "" line)
-              (parse (collect) '() 0))
+              (if (and (pair? par)
+                       (pair? (car par))
+                       (memq (caar par) '(h1 h2 h3 h4 h5 h6)))
+                  (parse res par list-level)
+                  (parse (collect) '() 0)))
              ((eqv? #\space (string-ref line 0))
               (let lp ((ls (list line)))
                 (if (eqv? #\space (peek-char in))
@@ -164,12 +176,11 @@
              ((irregex-match wiki-header-rx line)
               => (lambda (m)
                    (let* ((h (irregex-match-substring m 1))
-                          (depth (number->string (max (string-length h) 6))))
+                          (depth (number->string (min (string-length h) 6))))
                      (parse
-                      (cons (list (string->symbol (string-append "h" depth))
-                                  (irregex-match-substring m 2))
-                            (collect))
-                      '()
+                      (collect)
+                      (list (list (string->symbol (string-append "h" depth))
+                                  (irregex-match-substring m 2)))
                       0))))
              (else
               (let* ((level (wiki-list-level line))
