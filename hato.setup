@@ -1,7 +1,22 @@
 
-(use make)
+(use make extras)
 
 (define version (call-with-input-file "VERSION" read-line))
+
+;; compute dependencies for other modules in the current directory
+;; (define (module-deps mod)
+;;   (let* ((path (string-append (symbol->string mod) ".scm"))
+;;          (code (read-file path)))
+;;     (let deps ((x code) (res '()))
+;;       (if (pair? x)
+;;           (case (car x)
+;;             ((import use require-extension)
+;;              )
+;;             ((autoload)
+;;              )
+;;             (else
+;;              (module-deps (cdr x) (module-deps (car x) res))))
+;;           res))))
 
 (define-syntax compile-module
   (er-macro-transformer
@@ -66,10 +81,16 @@
 (compile-module hato-nntp)
 (compile-module hato-rfc3028)
 (compile-module hato-smtp)
+(compile-module hato-http)
 (compile-module hato-spf)
 (compile-module hato-token)
 (compile-module hato-prob)
 (compile-module hato-filter-env)
+(compile-module highlight)
+(compile-module html-summary)
+(compile-module wiki-utils)
+(compile-module wiki-parse)
+(compile-module wiki-write)
 
 (compile-executable hato-fetch)
 (compile-executable hato-httpd)

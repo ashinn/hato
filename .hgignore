@@ -6,6 +6,11 @@ syntax: glob
 *.tar.bz2
 *.tar.gz
 *.tgz
+*.cache
+*.sxml
+*.import.scm
+*.import.c
+*.pid
 manual/hato-manual.html
 manual/hato-manual-Z-A.scm
 hato-mta
@@ -14,6 +19,9 @@ hato-classify
 hato-cat
 hato-grep
 hato-httpd
+www/docs/code
+www/docs/emacs
+www/docs/scheme
 
 syntax: regexp
 (^|/)roots/[^/]*/root/(var|home)($|/)

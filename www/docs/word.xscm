@@ -1,0 +1,64 @@
+#! /usr/local/bin/csi -script
+
+(import extras ports)
+(require-extension
+ posix hato-uri hato-config hato-http wiki-parse wiki-write wiki-utils)
+
+(define (display-prefix title)
+  (display "<html>\n<head>\n<title>synthcode - ")
+  (display title)
+  (display "</title>
+<link rel=\"stylesheet\" href=\"/css/default.css\" type=\"text/css\" />
+<script type=\"text/javascript\" src=\"/js/utils.js\"></script>
+</head>
+<body>
+<div id=\"header\">
+<b>")
+  (display title)
+  (display "</b>
+</div>
+
+<div id=\"search\">
+<form action=\"http://www.google.com/search\">
+<input type=\"text\" name=\"q\" value=\"search...\" onfocus=\"javascript:if (this.value == 'search...') {this.value=''}\" />
+<input type=\"hidden\" name=\"domains\" value=\"synthcode.com\" />
+<input type=\"hidden\" name=\"sitesearch\" value=\"synthcode.com\" />
+</form>
+<small><a href=\"/feed.xscm\">feed</a></small>
+</div>
+
+<div id=\"main\">
+"))
+
+(define (display-suffix) (display "</div>\n\n</body>\n</html>\n"))
+
+(define (handle path uri headers config)
+  (let* ((params (http-parse-form uri headers))
+         (word (cond ((assoc "word" params) => cdr) (else #f)))
+         (wdir (conf-get config 'wiki-root "www/docs/wiki/"))
+         (base (string-append wdir (wiki-word-encode word)))
+         (raw-file (string-append base ".wiki"))
+         (cache-file (string-append base ".sxml")))
+    (display-prefix (wiki-word-display word))
+    (cond
+     ((not (file-exists? raw-file)))
+     (else
+      (let* ((raw-mtime (file-modification-time raw-file))
+             (cache-mtime (and (file-exists? cache-file)
+                               (file-modification-time cache-file))))
+        (cond
+         ((or (not cache-mtime) (> raw-mtime cache-mtime))
+          (let* ((sxml (wiki-sugar (call-with-input-file raw-file wiki-parse)
+                                   wdir
+                                   (conf-multi config 'wiki-aliases)))
+                 (out (open-output-file cache-file))
+                 (lock (file-lock out))
+                 )
+            (with-output-to-port out (lambda () (write sxml)))
+            (file-unlock lock)
+            (close-output-port out)
+            (wiki-write sxml)))
+         (else
+          (wiki-write (call-with-input-file cache-file read)))))))
+    (display-suffix)))
+

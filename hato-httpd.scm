@@ -3,14 +3,16 @@
 ;; Copyright (c) 2009 Alex Shinn.  All rights reserved.
 ;; BSD-style license: http://synthcode.com/license.txt
 
-(require-library srfi-1 srfi-13 srfi-69 tcp matchable sendfile let-args)
-(require-library hato-config hato-uri hato-utils hato-log hato-daemon hato-mime)
+(require-library
+ srfi-1 srfi-13 srfi-69 tcp lolevel matchable sendfile let-args
+ hato-config hato-uri hato-utils hato-log hato-daemon hato-mime hato-http)
 
 (module hato-httpd (main)
 
 (import scheme chicken extras ports regex posix files data-structures)
-(import srfi-1 srfi-13 srfi-69 tcp matchable sendfile let-args)
+(import srfi-1 srfi-13 srfi-69 tcp lolevel matchable sendfile let-args)
 (import hato-config hato-uri hato-utils hato-log hato-daemon hato-mime)
+(import hato-http)
 
 (define-logger (current-log-level set-current-log-level! info)
   (log-emergency log-alert log-critical log-error
@@ -22,17 +24,13 @@
    (lambda (e r c) (call-with-input-file "VERSION" read-line))))
 (define *program-version* (read-version))
 
-(define (http-parse-request . o)
-  (let ((line (string-split
-               (read-line (if (pair? o) (car o) (current-input-port)) 4096))))
-    (cons (string->symbol (car line)) (cdr line))))
-
-(define (http-respond status msg headers)
+(define (http-respond status msg . headers)
   (printf "HTTP/1.1 ~S ~A\r\n" status msg)
-  (for-each
-   (lambda (h)
-     (display (car h)) (display ": ") (display (cdr h)) (display "\r\n"))
-   headers)
+  (if (pair? headers)
+      (for-each
+       (lambda (h)
+         (display (car h)) (display ": ") (display (cdr h)) (display "\r\n"))
+       (car headers)))
   (display "\r\n"))
 
 (define http-mime-type
@@ -95,14 +93,22 @@
 (define (http-resolve-file file uri headers config)
   (string-append (http-document-root file uri headers config) "/" file))
 
-(define (http-send-directory dir uri headers config)
-  (http-respond 200 "OK" (append (http-base-headers config)
-                                 '((Content-Type . "text/html"))))
-  (display "<html><body bgcolor=white><pre>\n")
-  (for-each
-   (lambda (file) (print "<a href=\"" dir "/" file "\">" file "</a>"))
-   (directory dir))
-  (display "</pre></body></html>\n"))
+(define (http-send-directory vdir uri headers config)
+  (cond
+   ((find (lambda (f) (file-exists? (string-append vdir "/" f)))
+          (conf-get-list config 'index-files))
+    => (lambda (f)
+         (let ((uri2 (uri-with-path uri (string-append (uri-path uri) "/" f))))
+           (http-handle-get uri2 headers config config))))
+   (else
+    (http-respond 200 "OK" (append (http-base-headers config)
+                                   '((Content-Type . "text/html"))))
+    (display "<html><body bgcolor=white><pre>\n")
+    (let ((dir (string-trim (pathname-directory (uri-path uri)) #\/)))
+      (for-each
+       (lambda (file) (print "<a href=\"" dir "/" file "\">" file "</a>"))
+       (directory vdir)))
+    (display "</pre></body></html>\n"))))
 
 (define (char-uri? ch)
   (<= 33 (char->integer ch) 126))
@@ -111,7 +117,7 @@
   (let lp ((ls subst) (res '()))
     (cond
      ((null? ls) (string-concatenate-reverse res))
-     ((number? (car ls)) (lp (cdr ls) (cons (list-ref m (car ls)) res)))
+     ((number? (car ls)) (lp (cdr ls) (cons (or (list-ref m (car ls)) "") res)))
      (else (lp (cdr ls) (cons (car ls) res))))))
 
 (define (http-handle-get uri headers config vconfig)
@@ -125,12 +131,13 @@
       (log-warn "bad request: ~S" path)
       (http-respond 400 "Bad Request" '()))
      ;; 1) dispatch on rewrite rules
-     ((find (lambda (x) (cond ((string-match (car x) path)
-                          => (lambda (m) (list x m)))
-                         (else #f)))
-            (conf-multi config 'rewrite))
+     ((any (lambda (x) (cond ((string-match (car x) path)
+                         => (lambda (m) (list x m)))
+                        (else #f)))
+           (conf-multi config 'rewrite))
       => (match-lambda
              (((rx subst . flags) m)
+              (log-notice "redirecting: ~S ~S" path m)
               (let ((new-path (string-match-substitute m subst path)))
                 (cond
                  ((memq 'redirect flags)
@@ -138,9 +145,13 @@
                   (http-respond 302 "Moved Temporarily"
                                 `((Location . ,new-path))))
                  (else
-                  (http-handle-request (cons 'GET new-path "HTTP/1.1")
+                  (log-notice "internal redirecting => ~S" new-path)
+                  (http-handle-request (list 'GET new-path "HTTP/1.1")
                                        headers ;; XXXX adjust host
-                                       config)))))))
+                                       config)))))
+           (rule
+            (log-error "bad rewrite rule: ~S => ~S" path rule)
+            (http-respond 500 "Internal System Error"))))
      (else
       ;; 2) determine actual file in virtual directory
       (let ((vfile (http-resolve-file path uri headers vconfig)))
@@ -160,41 +171,88 @@
            (else
             (if (directory? vfile)
                 (http-send-directory vfile uri headers vconfig)
-                (case (assoc-ref (conf-multi config 'handlers)
-                                 (pathname-extension vfile))
+                (case (conf-get (list (conf-multi vconfig 'handlers))
+                                (string->symbol
+                                 (or (pathname-extension vfile) "xxx")))
                   ((private)
                    (log-warn "trying to access private file: ~S" vfile)
                    (http-respond 404 "Not Found" '()))
                   ((scheme)
-                   ((load-scheme-script vfile) vfile uri headers vconfig))
+                   ((load-scheme-script vfile vconfig)
+                    vfile uri headers vconfig))
                   ((cgi)
-                   #f)
-                  (else ; static file
+                   (system vfile))
+                  (else                 ; static file
                    (http-send-file vfile uri headers vconfig))))))))))))
 
 (define (http-handle-head uri headers config vconfig)
-  #f)
+  (http-handle-get uri headers config vconfig))
 
 (define (http-handle-post uri headers config vconfig)
-  #f)
+  (http-handle-get uri headers config vconfig))
 
 (define (black-listed? ipaddr config)
   (assoc ipaddr (conf-multi config 'black-list)))
 
-(define (load-scheme-script path)
-  #f)
+(define scheme-script-cache (make-hash-table))
+
+(define hash-table-ref/cache!
+  (let ((miss (list 'miss)))
+    (lambda (tab key thunk)
+      (let ((x (hash-table-ref/default tab key miss)))
+        (if (eq? x miss)
+            (let ((res (thunk)))
+              (hash-table-set! tab key res)
+              res)
+            x)))))
+
+(define (hash-table-ref/load! tab path proc)
+  (let* ((mtime (file-modification-time path))
+         (cell (hash-table-ref/cache!
+                tab
+                path
+                (lambda () (cons mtime (proc path))))))
+    (if (> mtime (car cell))
+        (let ((res (proc path)))
+          (hash-table-set! tab path (cons mtime res))
+          res)
+        (cdr cell))))
+
+(define (%load-scheme-script path config)
+  (call-with-input-file path
+    (lambda (in)
+      (cond ((eqv? #\# (peek-char in))
+             (read-char in)
+             (if (eqv? #\! (peek-char in)) (read-line in))))
+      (let* ((modname (string-append "modscheme-" path))
+             (handler-name (string-append modname "#handle"))
+             (body `(module ,(string->symbol modname) (handle)
+                      (import scheme chicken)
+                      ,@(read-file in))))
+        (eval body)
+        (global-ref (string->symbol handler-name))))))
+
+(define (load-scheme-script path config)
+  (hash-table-ref/load!
+   scheme-script-cache
+   path
+   (lambda (path) (%load-scheme-script path config))))
 
 (define (http-handle-request request headers config)
-  (let* ((uri (or (string->path-uri 'http (cadr request))
+  (let* ((uri (or (string->path-uri 'http (cadr request) #t #t)
                   (make-uri 'http #f #f #f)))
          (host (cond ((or (and (uri? uri) (uri-host uri))
                           (mime-ref headers "Host"))
                       => string-downcase->symbol)
                      (else #f)))
+         (uri (if (or (uri-host uri) (not host))
+                  uri
+                  (uri-with-host uri host)))
          (vconfig (cond
                    ((assq-ref (conf-multi config 'virtual-hosts) host)
                     => (lambda (x) (conf-extend x config)))
                    (else config))))
+    (log-notice "request: ~S uri: ~S" request uri)
     (case (car request)
       ((GET)  (http-handle-get uri headers config vconfig))
       ((HEAD) (http-handle-head uri headers config vconfig))
@@ -252,7 +310,7 @@
                     (if (zero? (current-user-id))
                         (string-append "/etc/" name)
                         (string-append (getenv "HOME") "/" name))))
-       (rcfile "config|c=s" (string-append confdir "/httpd.config"))
+       (rcfile "config|c=s" (string-append confdir "/httpd.conf"))
        (docroot "root|r=s")
        (port "port|p=i")
        (user "user|u=s")

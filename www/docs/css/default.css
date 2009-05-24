@@ -1,0 +1,54 @@
+body { background-color: white; color: black; font-family: verdana, "trebuchet MS", helvetica, sans-serif;}
+.keyword { color: #800080; background-color: inherit; }
+.function { color: #0000FF; background-color: inherit; }
+.variable { color: #B8860B; background-color: inherit; }
+.type { color: #008000; background-color: inherit; }
+.attribute { color: #FF5000; background-color: inherit; }
+.character { color: #0055AA; background-color: inherit; }
+.builtin { color: #FF00FF; background-color: inherit; }
+.comment { color: #FF0000; background-color: inherit; }
+.string { color: #BC8F8F; background-color: inherit; }
+.preprocessor { color: #FF00FF; background-color: inherit; }
+.syntaxerror { color: #FF0000; background-color: inherit; }
+.diff-deleted { color: #5F2121; background-color: inherit; }
+.diff-added { color: #215F21; background-color: inherit; }
+span.keyword a { color: #800080; background-color: inherit; text-decoration: none; }
+span.function a { color: #0000FF; background-color: inherit; text-decoration: none; }
+span.variable a { color: #B8860B; background-color: inherit; text-decoration: none; }
+span.type a { color: #008000; background-color: inherit; text-decoration: none; }
+span.attribute a { color: #FF5000; background-color: inherit; text-decoration: none; }
+span.character a { color: #0055AA; background-color: inherit; text-decoration: none; }
+span.builtin a { color: #FF00FF; background-color: inherit; text-decoration: none; }
+span.comment a { color: #FF0000; background-color: inherit; text-decoration: none; }
+span.string a { color: #BC8F8F; background-color: inherit; text-decoration: none; }
+span.preprocessor a { color: #FF00FF; background-color: inherit; text-decoration: none; }
+span.syntaxerror a { color: #FF0000; background-color: inherit; text-decoration: none; }
+span.diff-deleted a { color: #5F2121; background-color: inherit; text-decoration: none; }
+span.diff-added a { color: #215F21; background-color: inherit; text-decoration: none; }
+span.paren1 { color: #AAAAAA; background-color: inherit; }
+span.paren2 { color: #888888; background-color: inherit; }
+span.paren3 { color: #666666; background-color: inherit; }
+span.paren4 { color: #444444; background-color: inherit; }
+span.paren5 { color: #222222; background-color: inherit; }
+span.paren6 { color: #000000; background-color: inherit; }
+.notelink { color: #666666; }
+table { border: 0; table-layout: fixed; word-wrap: break-word; }
+td { line-height: 1.6em; vertical-align: top; padding-bottom: 1em; }
+td.main { width: 460px; padding-left: 2em; padding-right: 7em; }
+td.doc { width: 200px; }
+td.note { font-size: 12px; padding-top: 2em; }
+td.note1 { color: #222222; font-size: 12px; padding-top: 2em; padding-right: 2em; }
+td.note2 { color: #444444; font-size: 12px; padding-top: 2em; padding-right: 2em; }
+td.note3 { color: #666666; font-size: 12px; padding-top: 2em; padding-right: 2em; }
+td.note4 { color: #888888; font-size: 12px; padding-top: 2em; padding-right: 2em; }
+td.note5 { color: #AAAAAA; font-size: 12px; padding-top: 2em; padding-right: 2em; }
+td.note6 { color: #CCCCCC; font-size: 12px; padding-top: 2em; padding-right: 2em; }
+td.reply { font-size: 12px; padding-top: 2em; padding-left: 5em; }
+a { color: #888888; }
+a:hover { color: #CC0000; }
+div#header { font-size: 20px; padding-left: 140px; padding-top: 1em; padding-bottom: 1em; width: 70%; float: left; }
+div#controls { padding-top: 1em; padding-bottom: 1em; float: right; }
+div#main { clear: left; }
+pre { line-height: 1.2em; }
+li { padding-bottom: 1em; }
+#header small { font-size: 11px; }

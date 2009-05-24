@@ -1,0 +1,20 @@
+Well, I've finally succumbed and started a blog.  This has been on my
+list for years now, but naturally I didn't want to use any existing
+blogging software so I had to write my own, which meant I needed to
+write my own web framework, which meant I needed to rewrite my web
+server from scratch again.  In particular, the new margin-based
+annotations will make reading and navigation much simpler.{{I have
+discovered a truly marvellous proof of this, which this margin is too
+narrow to contain.}}
+
+Anyway, it's all working now, and hopefully I'll have some interesting
+posts to make in the near future.  There are a number of technical
+posts I've been wanting to write and simply haven't for lack of a
+decent venue, and also want to write about my travels and life in
+Japan.  In particular, now that I have a license and
+[http://uk.reuters.com/article/oilRpt/idUKT2250120090327 highway
+travel is so cheap] here I'm trying to see more of the surrounding
+country.
+
+Not that I really care if anyone reads this :) This is all for myself,
+as an outlet to rant and to organize my thoughts.

@@ -62,6 +62,13 @@
                i
                (lp (- i 1)))))))
 
+(define (string-index-of str pred . o)
+  (let-optionals* o ((start 0) (end (string-length str)))
+    (let lp ((i start))
+      (cond ((>= i end) #f)
+            ((pred (string-ref str i)) i)
+            (else (lp (+ i 1)))))))
+
 (define (string-downcase->symbol str)
   (let ((len (string-length str)))
     (let lp ((i 0))
@@ -123,6 +130,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; parsing - without :// we just split into scheme & path
 
+(define (char-uri-scheme-unsafe? ch)
+  (not (or (char-alphabetic? ch) (char-numeric? ch) (memv ch '(#\_ #\-)))))
+
 (define (string->path-uri scheme str . o)
   (define decode? (and (pair? o) (car o)))
   (define decode (if decode? uri-decode identity))
@@ -132,8 +142,12 @@
         decode))
   (if (pair? str)
       str
-      (let ((len (string-length str))
-            (colon (string-scan str #\:)))
+      (let* ((len (string-length str))
+             (colon0 (string-scan str #\:))
+             (colon
+              (and (not (string-index-of str char-uri-scheme-unsafe?
+                                         0 (or colon0 len)))
+                   colon0)))
         (if (or (not colon) (zero? colon))
             (and scheme
                  (let* ((quest (string-scan str #\? 0))

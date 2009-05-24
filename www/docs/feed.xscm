@@ -1,0 +1,25 @@
+#! /usr/local/bin/csi -script
+
+(import extras ports)
+(require-extension
+ posix hato-uri hato-config hato-http wiki-parse wiki-write wiki-utils)
+
+(define (handle path uri headers config)
+  (display "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>
+<rss version=\"2.0\">
+<channel>
+<title>Alex Shinn's Blog</title>
+<link>http://synthcode.com/blog/</link>
+<pubDate>Mon, 25 May 2009 00:17:38 GMT</pubDate>
+<lastBuildDate>Mon, 25 May 2009 00:17:38 GMT</lastBuildDate>
+
+<item>
+<title>Introduction</title>
+<link></link>
+<pubDate>Mon, 25 May 2009 00:17:38 GMT</pubDate>
+</item>
+
+</channel>
+</rss>
+"))
+

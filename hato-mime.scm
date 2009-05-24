@@ -388,10 +388,17 @@
 ;; (mime (^ (header . value) ...) parts ...)
 (define (mime-message->sxml . o)
   (car
-   (mime-message-fold
+   (apply
+    mime-message-fold
     (if (pair? o) (car o) (current-input-port))
     (lambda (parent-headers headers body seed)
       `((mime (^ ,@headers) ,body) ,@seed))
-    '())))
+    '()
+    (lambda (headers seed) '())
+    (lambda (headers parent-seed seed)
+      `((mime (^ ,@headers)
+              ,@(if (pair? seed) (reverse seed) seed))
+        ,@parent-seed))
+    (if (pair? o) (cdr o) '()))))
 
 )
