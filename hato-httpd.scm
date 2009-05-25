@@ -257,9 +257,10 @@
                    (http-respond 404 "Not Found" '()))
                   ((scheme)
                    (let ((handler (load-scheme-script vfile vconfig)))
-                     (http-respond 200 "OK"
-                                   (append (http-base-headers config)
-                                           '((Content-Type . "text/html"))))
+                     (http-respond
+                      200 "OK"
+                      (append (http-base-headers config)
+                              '((Content-Type . "text/html; charset=UTF-8"))))
                      (handler vfile uri headers vconfig)))
                   ((cgi)
                    (system vfile))
