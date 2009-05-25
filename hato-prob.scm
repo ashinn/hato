@@ -34,6 +34,9 @@
 (import html-parser hato-i3db hato-mime hato-token)
 (include "write-number.scm")
 
+(define (set-file-position! fd where . o)
+  (set! (file-position fd) (if (pair? o) (cons where o) where)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; compile with "-feature debug" for more debugging info
 

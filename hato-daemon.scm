@@ -88,31 +88,36 @@
               (log-debug "tcp-server: finished ~S\n"
                          count (thread-name (current-thread))))
             (lambda (count) (handler))))
-      (let serve ((count 0))
-        (cond
-         ((<= max-requests 0)
-          (thread-yield!))
-         (else
-          (receive (in out) (accept listener)
-            (thread-start!
-             (make-thread
-              (lambda ()
-                (set! max-requests (- max-requests 1))
-                (current-input-port in)
-                (current-output-port out)
-                (condition-case (run count)
-                  (exn ()
-                       (cond
-                        (log-error
-                         (log-error "tcp-server: error in thread ~S: ~A\n"
-                                    (thread-name (current-thread))
-                                    (with-output-to-string
-                                      (lambda () (print-error-message exn))))
-                         (print-call-chain (current-error-port))))))
-                (close-input-port in)
-                (close-output-port out)
-                (set! max-requests (+ max-requests 1))))))
-          (serve (+ count 1))))))))
+      (let ((max-requests (if (integer? max-requests)
+                              max-requests
+                              default-max-requests)))
+        (let serve ((count 0))
+          (cond
+           ((<= max-requests 0)
+            (thread-yield!))
+           (else
+            (receive (in out) (accept listener)
+              (thread-start!
+               (make-thread
+                (lambda ()
+                  (condition-case
+                      (begin
+                        (set! max-requests (- max-requests 1))
+                        (current-input-port in)
+                        (current-output-port out)
+                        (run count))
+                    (exn ()
+                         (cond
+                          (log-error
+                           (log-error "tcp-server: error in thread ~S: ~A\n"
+                                      (thread-name (current-thread))
+                                      (with-output-to-string
+                                        (lambda () (print-error-message exn))))
+                           (print-call-chain (current-error-port))))))
+                  (close-input-port in)
+                  (close-output-port out)
+                  (set! max-requests (+ max-requests 1))))))
+            (serve (+ count 1)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; daemons

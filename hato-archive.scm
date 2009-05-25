@@ -78,6 +78,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (set-file-position! fd where . o)
+  (set! (file-position fd) (if (pair? o) (cons where o) where)))
+
 (define (current-seconds-string)
   (let* ((now (number->string (current-seconds)))
          (now-len (string-length now)))

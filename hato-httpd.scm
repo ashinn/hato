@@ -24,6 +24,81 @@
    (lambda (e r c) (call-with-input-file "VERSION" read-line))))
 (define *program-version* (read-version))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; This looks big and hairy, but it's mutation-free and guarantees:
+;;   (string=? s (path-normalize s))  <=>  (eq? s (path-normalize s))
+;; i.e. fast and simple for already normalized paths.
+
+(define (path-normalize path)
+  (let* ((len (string-length path)) (len-1 (- len 1)))
+    (define (collect i j res)
+      (if (>= i j) res (cons (substring path i j) res)))
+    (define (finish i res)
+      (if (zero? i)
+        path
+        (apply string-append (reverse (collect i len res)))))
+    ;; loop invariants:
+    ;;   - res is a list such that (string-concatenate-reverse res)
+    ;;     is always the normalized string up to j
+    ;;   - the tail of the string from j onward can be concatenated to
+    ;;     the above value to get a partially normalized path referring
+    ;;     to the same location as the original path
+    (define (inside i j res)
+      (if (>= j len)
+        (finish i res)
+        (if (eqv? #\/ (string-ref path j))
+          (boundary i (+ j 1) res)
+          (inside i (+ j 1) res))))
+    (define (boundary i j res)
+      (if (>= j len-1)
+        (finish i res)
+        (case (string-ref path j)
+          ((#\.)
+           (case (string-ref path (+ j 1))
+             ((#\.)
+              (if (or (>= j (- len 2)) (eqv? #\/ (string-ref path (+ j 2))))
+                (if (>= i (- j 1))
+                  (if (null? res)
+                    (backup j "" '())
+                    (backup j (car res) (cdr res)))
+                  (backup j (substring path i j) res))
+                (inside i (+ j 2) res)))
+             ((#\/)
+              (if (= i j)
+                (boundary (+ j 2) (+ j 2) res)
+                (let ((s (substring path i j)))
+                  (boundary (+ j 2) (+ j 2) (cons s res)))))
+             (else (inside i (+ j 1) res))))
+          ((#\/) (boundary (+ j 1) (+ j 1) (collect i j res)))
+          (else (inside i (+ j 1) res)))))
+    (define (backup j s res)
+      (let ((pos (+ j 3)))
+        (cond
+          ;; case 1: we're reduced to accumulating parents of the cwd
+          ((or (string=? s "/..") (string=? s ".."))
+           (boundary pos pos (cons "/.." (cons s res))))
+          ;; case 2: the string isn't a component itself, skip it
+          ((or (string=? s "") (string=? s ".") (string=? s "/"))
+           (if (pair? res)
+             (backup j (car res) (cdr res))
+             (boundary pos pos (if (string=? s "/") '("/") '("..")))))
+          ;; case3: just take the directory of the string
+          (else
+           (let ((d (pathname-directory s)))
+             (cond
+               ((string=? d "/")
+                (boundary pos pos (if (null? res) '("/") res)))
+               ((string=? d ".")
+                (boundary pos pos res))
+               (else (boundary pos pos (cons "/" (cons d res))))))))))
+    ;; start with boundary if abs path, otherwise inside
+    (if (zero? len)
+      path
+      ((if (eqv? #\/ (string-ref path 0)) boundary inside) 0 1 '()))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define (http-respond status msg . headers)
   (printf "HTTP/1.1 ~S ~A\r\n" status msg)
   (if (pair? headers)
@@ -91,7 +166,10 @@
       (string-append (current-directory) "/www")))
 
 (define (http-resolve-file file uri headers config)
-  (string-append (http-document-root file uri headers config) "/" file))
+  (string-append
+   (http-document-root file uri headers config) "/"
+   (string-trim (path-normalize file)
+                (lambda (c) (if (eqv? c #\.) #t (eqv? c #\/))))))
 
 (define (http-send-directory vdir uri headers config)
   (cond
@@ -354,7 +432,7 @@
        (else
         (daemonize 'name: name
                    'pid-file: pid-file
-                   'tcp-port: (conf-get config 'port 5555)
+                   'tcp-port: (conf-get config 'port 5556)
                    'user-id: (conf-get config 'user-id)
                    'group-id: (conf-get config 'group-id)
                    'tcp-debug?: (conf-get config 'debug?)

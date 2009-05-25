@@ -75,7 +75,7 @@
         (wiki-word-rx
          (irregex "\\[\\[([^\\]|]+)(?:\\| *([^\\]|]+))?\\]\\]"))
         (wiki-note-rx
-         (irregex "\\{\\{([^\\}|]+)(?:\\| *([^\\}|]+))?\\}\\}"))
+         (irregex "\\{\\{([^\\}]+)\\}\\}")) ;;(?:\\| *([^\\}|]+))?
         (wiki-url-rx
          (irregex "((?:https?|ftp):/+[\\-+.,_/%?&~=:\\w]+[\\-+_/%?&~=:\\w])"))
         (wiki-named-url-rx
@@ -92,8 +92,9 @@
          (,wiki-note-rx
           ,(lambda (m)
              (list 'note
-                   (irregex-match-substring m 1)
-                   (irregex-match-substring m 2))))
+                   (wiki-parse-inline (irregex-match-substring m 1))
+                   ;;(irregex-match-substring m 2)
+                   #f)))
          (,wiki-named-url-rx
           ,(lambda (m)
              (list 'url

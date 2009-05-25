@@ -23,6 +23,9 @@
 
 (import scheme chicken extras posix lolevel srfi-4)
 
+(define (set-file-position! fd where . o)
+  (set! (file-position fd) (if (pair? o) (cons where o) where)))
+
 (define (pointer-u24-ref ptr)
   (bitwise-ior (arithmetic-shift (pointer-u16-ref ptr) 8)
                (pointer-u8-ref (pointer-offset ptr 2))))

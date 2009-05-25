@@ -8,6 +8,8 @@ syntax: glob
 *.tgz
 *.cache
 *.sxml
+*.o
+*.so
 *.import.scm
 *.import.c
 *.pid
