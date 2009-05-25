@@ -256,8 +256,11 @@
                    (log-warn "trying to access private file: ~S" vfile)
                    (http-respond 404 "Not Found" '()))
                   ((scheme)
-                   ((load-scheme-script vfile vconfig)
-                    vfile uri headers vconfig))
+                   (let ((handler (load-scheme-script vfile vconfig)))
+                     (http-respond 200 "OK"
+                                   (append (http-base-headers config)
+                                           '((Content-Type . "text/html"))))
+                     (handler vfile uri headers vconfig)))
                   ((cgi)
                    (system vfile))
                   (else                 ; static file
