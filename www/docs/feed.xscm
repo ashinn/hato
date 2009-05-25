@@ -8,14 +8,14 @@
   (display "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>
 <rss version=\"2.0\">
 <channel>
-<title>Alex Shinn's Blog</title>
+<title>synthcode blog</title>
 <link>http://synthcode.com/blog/</link>
 <pubDate>Mon, 25 May 2009 00:17:38 GMT</pubDate>
 <lastBuildDate>Mon, 25 May 2009 00:17:38 GMT</lastBuildDate>
 
 <item>
 <title>Introduction</title>
-<link>http://localhost:5556/blog/2009/05/introduction</link>
+<link>http://synthcode.com/blog/2009/05/introduction</link>
 <pubDate>Mon, 25 May 2009 17:31:13 GMT</pubDate>
 </item>
 
