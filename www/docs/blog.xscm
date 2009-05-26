@@ -124,6 +124,7 @@
          (wiki-file (and base (string-append base ".wiki"))))
     (cond
      ((or (not wiki-file) (not (file-exists? wiki-file)))
+      (fprintf (current-error-port) "******* no such file: ~S\n" wiki-file)
       (display-prefix "synthcode blog" #f)
       (display-summary config wdir)
       (display-suffix))
