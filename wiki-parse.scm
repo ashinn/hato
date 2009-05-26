@@ -15,7 +15,7 @@
       (string-translate
        (irregex-replace/all
         wiki-unsafe-rx
-        (string-downcase str)
+        str
         (lambda (m)
           (let ((n (char->integer (string-ref (irregex-match-substring m) 0))))
             (string-append "_" (if (< n 16) "0" "")
