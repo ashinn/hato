@@ -53,8 +53,11 @@
   (string-substitute
    paren-rx
    ""
-   (cond ((string-index-right str #\:) => (lambda (i) (substring str (+ i 1))))
-         (else str))))
+   (string-translate
+    (cond ((string-index-right str #\:) => (lambda (i) (substring str (+ i 1))))
+          (else str))
+    "_"
+    " ")))
 
 (define (wiki-code-links x words aliases)
   ;; XXXX handle other languages
@@ -90,18 +93,21 @@
            (cond
             ((find (lambda (a) (string-prefix-ci? (car a) word)) aliases)
              => (lambda (a)
-                  (let ((rel-word (substring word (string-length (car a)))))
+                  (let* ((rel-word (substring word (string-length (car a))))
+                         (name (if (and (pair? (cddr x)) (caddr x))
+                                   (caddr x)
+                                   rel-word)))
                     (cond
                      ((and (pair? (cddr a)) (pair? (caddr a)))
                       ;; inline docs like r5rs:
                       (let ((cell (assq (string->symbol rel-word) (cddr a))))
                         (if (not cell)
-                            (list 'wiki (cadr a) rel-word)
+                            (list 'wiki (cadr a) name)
                             (let* ((url (string-append (cadr a)
                                                        (or (cadr cell) "")))
                                    (doc (and (pair? (cddr cell))
                                              (caddr cell))))
-                              (list 'wiki url rel-word
+                              (list 'wiki url name
                                     (and (not (equal? "" doc)) doc))))))
                      (else
                       (let* ((url (string-append
@@ -111,7 +117,7 @@
                                     ((summary) (get-summary url word words))
                                     ((title) (get-title url word words))
                                     (else ""))))
-                        (list 'wiki url rel-word
+                        (list 'wiki url name
                               (and doc
                                    (not (equal? "" doc))
                                    (html-escape doc)))))))))

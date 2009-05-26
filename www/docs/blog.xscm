@@ -40,7 +40,8 @@
 "))
 
 (define (display-summary config wdir)
-  (let ((bdir (string-append wdir "/blog/")))
+  (let ((bdir (string-append wdir "/blog/"))
+        (par 1))
     (for-each
      (lambda (year)
        (let ((ydir (string-append bdir (number->string year))))
@@ -58,8 +59,9 @@
                                             "/"
                                             (pathname-strip-extension f))))
                    (wiki-write
-                    (list
-                     `(p (a (@ (href ,path)) ,(pathname-strip-extension f))
+                    `((p (a (@ (href ,path))
+                            ,(wiki-word-display
+                              (pathname-strip-extension f)))
                          (br)
                          (small
                           "posted by "
@@ -67,15 +69,27 @@
                           " on "
                           ,(seconds->string
                             (file-modification-time
-                             (string-append mdir "/" f)))))
-                     (car (get-sxml wdir config (string-append mdir "/" f)))
-                     `(a (@ (href ,path)) "[Read more...]")))))
-               (filter (lambda (f) (equal? "wiki" (pathname-extension f)))
-                       (directory mdir)))))
+                             (string-append mdir "/" f))))
+                         ,(car (get-sxml wdir
+                                         config
+                                         (string-append mdir "/" f)))
+                         (a (@ (href ,path)) "[Read more...]")))
+                    par)
+                   (set! par (+ par 1))))
+               (sort (filter (lambda (f) (equal? "wiki" (pathname-extension f)))
+                             (directory mdir))
+                     (lambda (f1 f2)
+                       (> (file-modification-time (string-append mdir "/" f1))
+                          (file-modification-time (string-append mdir "/" f2))
+                          ))))))
           (sort (filter-map string->number (directory ydir)) >))))
      (sort (filter-map string->number (directory bdir)) >))))
 
-(define (display-suffix) (display "</div>\n\n</body>\n</html>\n"))
+(define (display-suffix)
+  (display "</div>\n\n<div id=\"footer\"></div>")
+  (display "<div id=\"copyright\">Copyright &copy; ")
+  (display (+ 1900 (vector-ref (seconds->local-time (current-seconds)) 5)))
+  (display " Alex Shinn</div></body>\n</html>\n"))
 
 (define date-rx
   (regexp "^([0-9][0-9][0-9][0-9]/[0-9][0-9]/)(.+)"))
@@ -115,7 +129,8 @@
       (display-suffix))
      (else
       (let ((sxml (get-sxml wdir config wiki-file)))
-        (display-prefix (html-escape title) (file-modification-time wiki-file))
+        (display-prefix (html-escape (wiki-word-display title))
+                        (file-modification-time wiki-file))
         (wiki-write sxml)
         (display-suffix))))))
 

@@ -361,12 +361,13 @@
                         ((eqv? #\: (peek-char in))
                          (highlight-class 'function id1 out))
                         (else
-                         (let lp ((decls '()))
-                           (let ((id id1)
-                                 (space (read-whitespace in)))
+                         (let lp ((decls '())
+                                  (id id1))
+                           (let ((space (read-whitespace in)))
                              (cond
                               ((char-c-initial? (peek-char in))
-                               (lp (cons space (cons id decls))))
+                               (lp (cons space (cons id decls))
+                                   (read-identifier '())))
                               ((eqv? #\( (peek-char in))
                                (highlight-start 'type out)
                                (for-each (lambda (x) (display x out))

@@ -1,9 +1,10 @@
 
-(require-library regex srfi-1 srfi-13)
+(require-library regex srfi-1 srfi-13 html-parser)
 
 (module wiki-parse (wiki-parse wiki-word-encode wiki-word-decode)
 
 (import scheme chicken extras irregex data-structures srfi-1 srfi-13)
+(import html-parser)
 
 ;; translate a wiki word to a safe pathname (after escaping, colons
 ;; ':' are translated to slashes '/' to create a diretory hierarchy of
@@ -35,8 +36,6 @@
            (string->number (irregex-match-substring m 1) 16))))))))
 
 (define (%irregex-multi-fold ls str start end)
-  ;;(fprintf (current-error-port) "irregex-multi-fold ~S ~S-~S\n"
-  ;;         (length ls) start end)
   (cond
    ((null? ls)
     (if (>= start end) '() (list (substring str start end))))
@@ -46,12 +45,10 @@
      (lambda (i m x)
        (let ((left (%irregex-multi-fold (cdr ls) str i (irregex-match-start m)))
              (right (reverse (irregex-apply-match m (cdar ls)))))
-         ;;(fprintf (current-error-port) "left: ~S right: ~S\n" left right)
          (append x left right)))
      '()
      str
      (lambda (i x)
-       ;;(fprintf (current-error-port) "final: ~S ~S\n" i x)
        (append x (%irregex-multi-fold (cdr ls) str i end)))
      start
      end))))
@@ -63,6 +60,20 @@
                  (string-length str))))
     (%irregex-multi-fold ls str start end)))
 
+(define (irregex-split irx str)
+  (reverse
+   (irregex-fold
+    irx
+    (lambda (i m x)
+      (let ((j (irregex-match-start m)))
+        (if (> j i) (cons (substring str i j) x) x)))
+    '()
+    str
+    (lambda (i x)
+      (if (< i (- (string-length str) 1))
+          (cons (substring str i) x)
+          x)))))
+
 (define wiki-parse-inline
   (let ((wiki-bold-rx
          (irregex "'''([^']+)'''")) ;;"\\*([^*]+)\\*"
@@ -72,29 +83,56 @@
          (irregex "<u>([^<]+)</u>"))
         (wiki-strike-out-rx
          (irregex "<s>([^<]+)</s>"))
-        (wiki-word-rx
-         (irregex "\\[\\[([^\\]|]+)(?:\\| *([^\\]|]+))?\\]\\]"))
+        (wiki-table-rx
+         (irregex "\\{\\|(.*)\n((?:\\|[^}]|[^|])*)\\|\\}"))
+        (wiki-row-rx
+         (irregex "\n\\|- *"))
+        (wiki-col-rx
+         (irregex "\\|\\|"))
         (wiki-note-rx
          (irregex "\\{\\{([^\\}]+)\\}\\}")) ;;(?:\\| *([^\\}|]+))?
+        (wiki-word-rx
+         (irregex "\\[\\[([^\\]|]+)(?:\\| *([^\\]|]+))?\\]\\]"))
         (wiki-url-rx
          (irregex "((?:https?|ftp):/+[\\-+.,_/%?&~=:\\w]+[\\-+_/%?&~=:\\w])"))
         (wiki-named-url-rx
          (irregex "\\[((?:https?|ftp):/+[\\-+.,_/%?&~=:\\w]+[\\-+_/%?&~=:\\w])[ \t\n]+([^\\]]*)\\]")))
     (lambda (str)
       (irregex-multi-fold
-       `((,wiki-word-rx
+       `((,wiki-table-rx
           ,(lambda (m)
-             (list 'wiki
-                   (irregex-match-substring m 1)
-                   (wiki-word-encode
-                    (or (irregex-match-substring m 2)
-                        (irregex-match-substring m 1))))))
+             (append
+              (car
+               (html->sxml
+                (string-append
+                 "<table "
+                 (or (irregex-match-substring m 1) "")
+                 ">")))
+              (map (lambda (row)
+                     (cons 'tr
+                           (map (lambda (col)
+                                  (cons 'td
+                                        (wiki-parse-inline
+                                         (string-trim-both col))))
+                                (irregex-split
+                                 wiki-col-rx
+                                 (string-trim
+                                  row
+                                  (lambda (c)
+                                    (or (char-whitespace? c) (eqv? c #\|))))))))
+                   (irregex-split
+                    wiki-row-rx
+                    (string-append "\n" (irregex-match-substring m 2)))))))
          (,wiki-note-rx
           ,(lambda (m)
              (list 'note
                    (wiki-parse-inline (irregex-match-substring m 1))
-                   ;;(irregex-match-substring m 2)
                    #f)))
+         (,wiki-word-rx
+          ,(lambda (m)
+             (list 'wiki
+                   (irregex-match-substring m 1)
+                   (irregex-match-substring m 2))))
          (,wiki-named-url-rx
           ,(lambda (m)
              (list 'url

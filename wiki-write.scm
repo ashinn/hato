@@ -1,10 +1,10 @@
 
-(require-library srfi-1 srfi-13 highlight html-parser wiki-utils)
+(require-library srfi-1 srfi-13 highlight html-parser hato-uri wiki-utils)
 
 (module wiki-write (wiki-write)
 
 (import scheme chicken extras regex srfi-1 srfi-13)
-(import highlight html-parser wiki-utils)
+(import highlight html-parser hato-uri wiki-utils)
 
 (define (wiki-write-main x par note)
   (define (wiki-write x note) (wiki-write-main x par note))
@@ -21,7 +21,13 @@
          (display "]</sup></span>")
          (+ note 1))))
       ((wiki)
-       (display "<a href=\"") (display (cadr x))
+       (display "<a href=\"")
+       (if (not (or (string->uri (cadr x))
+                    (and (> (string-length (cadr x)) 0)
+                         (eqv? #\/ (string-ref (cadr x) 0)))))
+           ;; XXXX lookup wiki dir
+           (display "/wiki/"))
+       (display (cadr x))
        (display "\"")
        (cond
         ((and (pair? (cddr x)) (pair? (cdddr x)) (string? (cadddr x)))
@@ -31,7 +37,7 @@
          ;;(display "')\"")
          ))
        (display ">")
-       (display (wiki-word-display (caddr x)))
+       (display (wiki-word-display (or (caddr x) (cadr x))))
        (display "</a>")
        note)
       (else
@@ -61,10 +67,11 @@
           (display "\" />")
           note)
          (else
-          (display "<span class=\"notelink\">[")
+          (display "<p><span class=\"notelink\">[")
           (display note)
-          (display "]</span> ")
+          (display "]</span>")
           (wiki-write-main (cadr x) par note)
+          (display "</p>\n")
           (+ note 1))))
        (else
         (wiki-write-notes (cdr x) par (wiki-write-notes (car x) par note))))
@@ -80,10 +87,13 @@
     (display "\n</td>\n</tr>\n")
     note2))
 
-(define (wiki-write x)
+(define (wiki-write x . o)
   (display "<table>\n")
-  (fold wiki-write-row 1 x (iota (length x) 1))
-  (display "</table>\n"))
+  (let* ((par (if (pair? o) (car o) 1))
+         (note (if (and (pair? o) (pair? (cdr o))) (cadr o) 1))
+         (res (fold wiki-write-row note x (iota (length x) par))))
+    (display "</table>\n")
+    res))
 
 )
 

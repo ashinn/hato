@@ -1,0 +1,249 @@
+
+For [[wp:Google Summer of Code]] I'm working on porting and
+customizing a [[wp:Scheme (programming language)]] to
+[[wp:Plan 9 from Bell Labs|Plan 9]].  I'm using my own
+[[chibi-scheme]] as a basis since it's very small with minimal
+dependencies, and hope to add support for writing [[wp:9P]] servers.
+But one of the tasks involved is adding [[wp:Unicode]]
+support, and as Chibi has no dependencies I'm free to explore the
+best possible string representation.  This seems an all-too neglected
+topic, with different programs and libraries using different
+representations, {{[[wp:GNOME]], [[wp:Perl]] and [[wp:vim]] use UTF-8
+internally, [[wp:Java (programming language)]] and
+[[wp:.NET_Framework|.NET]] use UTF-16, many existing Schemes use
+UTF-32.}} but no good comprehensive studies.  Indeed, it's difficult
+to compare because once you choose a representation you tie yourself
+to its implementation and idioms, so any comparison would be between
+apples and oranges.  But I'm hoping Chibi's simplicity will let me
+implement and compare several representations using the same programs
+in the same language.  {{Disclaimer: I've worked with UTF-8
+extensively, and UTF-8 is of course a Plan 9 invention, so I have some
+prior bias here.}}
+
+There are really only three string representations worth
+considering:{{For Unicode anyway - there are alternatives such as
+[[wp:TRON (encoding)]] and 
+[http://www.kanji.zinbun.kyoto-u.ac.jp/projects/chise/ CHISE]
+but these are outside the scope of this discussion.}} [[wp:UTF-8]],
+[[wp:UTF-16]] and [[wp:UTF-32]].{{When representing the lowest-level
+encoding of a consecutive sequence of characters - more sophisticated
+data-types such as ropes or trees of string can be built on top of
+these.}}  These all have various procs and cons.  UTF-8 is a variable
+width encoding using from 1 to 4 bytes per character, which is
+backwards compatible with 7-bit ASCII.  UTF-32 is a fixed-width
+encoding using 4 bytes per character.  UTF-16 is something of a
+hybrid, using 2 bytes for most characters but sometimes requiring 4
+bytes encoded as "surrogate pairs" - it is neither fixed width nor
+backwards compatible with ASCII, but takes less space than UTF-8 in
+some cases.  If you use either of the variable width encodings, you
+need to use cursors or pointers, but if you use UTF-32 you can treat
+the string as an indexable array of characters.{{So long as characters
+are code-points - if you want to work at the grapheme level you're
+back to pointers.}}  We'll look at what these differences mean to
+your API in a later post; for now we're concerned with the underlying
+performance of the representations.
+
+Setting aside UTF-16, UTF-8 vs UTF-32 looks like a classic time/space
+trade-off.  UTF-8 is never larger, and is typically 4x smaller than
+UTF-32 for English text.  So if you have a 4GB corpus of English text
+(say the English Wikipedia pages) in UTF-8, you'll need 16GB of memory
+to store that text as UTF-32.  On the other hand, for every character
+access in UTF-8 you need to perform a check to determine the number of
+bytes in the character and then combine them, which is pretty heavy
+compared to a simple memory reference.  A typical routine to read a
+character would look like:{{Unless otherwise noted, all code posted is
+covered by a BSD-style license described at
+http://synthcode.com/license.txt - basically you can use the code for
+whatever you want, just give me credit.}}
+
+  /* read a single well-formed utf8 character  */
+  /* from p, and advance p to the start of the */
+  /* next character                            */
+  int read_utf8_char0(char **pp) {
+    char *p = *pp;
+    int res = (unsigned char)*p++;
+    
+    if (res >= 0xC0) {
+      if (res < 0xE0) {           /* 2 bytes */
+        res = ((res&63)<<6) + (63&*p++);
+      } else if (res < 0xF0) {    /* 3 bytes */
+        res = ((res&31)<<6) + (63&*p++);
+        res = (res<<6) + (63&*p++);
+      } else {                    /* 4 bytes */
+        res = ((res&15)<<6) + (63&*p++);
+        res = (res<<6) + (63&*p++);
+        res = (res<<6) + (63&*p++);
+      }
+    }
+    
+    *pp = p;
+    return res;
+  }
+
+This is mitigated somewhat by the fact that in many cases you can
+write string algorithms working just at the byte-level, without
+decomposing individual characters.  For example, it's been shown that
+[http://canonical.org/~kragen/strlen-utf8.html counting characters in UTF-8 is fast],
+and even [http://labs.cybozu.co.jp/blog/mitsunari/2008/06/fast_strlen_and_memchr_by_sse2_1.html vectorizable].  String search on UTF-8 strings can be
+done at the byte-level{{This is not true for UTF-16}}, which will thus
+tend to be faster than UTF-32 simply because there are fewer bytes to
+search.
+
+But at some point you do need to decode the UTF-8 characters, and if
+this happens in a tight loop it's really going to hurt performance,
+especially when the branch-prediction fails.  Those branches, though,
+we can do something about.  Instead of the conditionals, we can use a
+lookup table on the first byte to determine the length.  We can then
+combine this with standard branchless programming techniques to
+produce:
+
+  /* first-byte lookup table encoded as an integer */
+  #define magic 3841982464uL
+  
+  int read_utf8_char1(char **pp) {
+    char *p = *pp;
+    int tmp, len, res = (unsigned char)*p++;
+    
+    tmp = (res>>7);
+    /* tmp is 0 if len is 1, 1 otherwise */
+    len = (res>>4)*2;
+    len = tmp*(((magic&(3<<len))>>len)+1) + (1-tmp);
+    res = ((res<<len)&255)>>len;
+    res = (tmp*((res<<6)+(63&*p))) + (1-tmp)*res;
+    p += tmp;
+    tmp = (len-1)>>1;
+    /* tmp is 1 if len is 3,4 0 otherwise */
+    res = (tmp*((res<<6)+(63&*p))) + (1-tmp)*res;
+    p += tmp;
+    tmp = len>>2;
+    /* tmp is 1 if len is 4, 0 otherwise */
+    res = (tmp*((res<<6)+(63&*p))) + (1-tmp)*res;
+    p += tmp;
+    
+    *pp = p;
+    return res;
+  }
+
+Although it looks longer, this actually compiles to fewer instructions
+than the version with conditionals.  The length decoding by itself is
+a handy routine that can be used elsewhere, but in this case we can
+save ourselves a register and a few instructions by only checking the
+length a bit at a time:
+
+  /* without directly computing length */
+  int read_utf8_char2(char **pp) {
+    char *p = *pp;
+    int bit, ch;
+    
+    ch = (unsigned char)*p++;    /* read the first byte         */
+    bit = ch>>7;                 /* bit==1 if non-ASCII         */
+    ch -= bit*192;               /* clear top 2 bits            */
+    ch <<= (6*bit);              /* if non-ASCII: shift 6 bits, */
+    ch += (63&*p)*bit;           /*     add in the next byte,   */
+    p += bit;                    /*     and inc the pointer     */
+    bit *= ((ch&2048)>>11);      /* bit==1 if len is 3 or 4     */
+    ch &= 2047;                  /* clear top bit for len >= 2  */
+    ch <<= (6*bit);              /* if len==3-4: shift 6 bits,  */
+    ch += (63&*p)*bit;           /*     add in the next byte,   */
+    p += bit;                    /*     and inc the pointer     */
+    bit *= ((ch&65536)>>16);     /* bit==1 if len is 4          */
+    ch &= 65535;                 /* clear top bit for len >= 3  */
+    ch <<= (6*bit);              /* if len is 4: shift 6 bits,  */
+    ch += (63&*p)*bit;           /*     add in the next byte,   */
+    p += bit;                    /*     and inc the pointer     */
+    ch &= 2097151;               /* clear top bit for len==4    */
+    
+    *pp = p;
+    return ch;
+  }
+
+A detailed desconstruction of these functions is left as an excercise
+for the reader - the point is not to discuss bit-twiddling hacks, but
+to provide the most efficient routines possible for future comparison.
+So to continue, the basic UTF-16 decoder looks like:
+
+  /* read and test for surrogate pairs */
+  int read_utf16_char0 (unsigned short **pp) {
+    int ch = *(*pp)++;
+    if ((ch >= 0xD800) && (ch <= 0xDBFF))
+      ch = ((ch - 0xD800) << 10) + (*(*pp)++ - 0xDC00) + 0x10000;
+    return ch;
+  }
+
+We're not using wchar_t here because it's unspecified whether that's 2
+or 4 bytes (it's 4 for GNU libc).  Using similar bit-twiddling hacks
+as above, we can make this branchless as well:
+
+  /* the first surrogate word begins with 11011 */
+  int read_utf16_char1 (unsigned short **pp) {
+    int x, ch = *(*pp)++;
+    x = (ch >> 11) == 27;
+    ch = ch*(1-x) + (((ch - 0xD800) << 10) + (**pp - 0xDC00) + 0x10000)*x;
+    (*pp) += x;
+    return ch;
+  }
+
+And finally, for comparison is the UTF-32 "decoder":
+
+  
+  int read_utf32_char0 (unsigned int **pp) {
+    return *(*pp)++;
+  }
+
+In practice, the UTF-32 decoder is always going to be inlined as two
+instructions.  The others are still all small enough that we can
+inline them anywhere performance is needed.
+
+And now for the part that everyone's been waiting for, the benchmark!
+How do these decoders measure up to each other?  Or more specifically,
+how much slower are the alternatives to UTF-32 at processing strings a
+character at a time?  We're going to skew the benchmark in the favor
+of UTF-32 as much as possible, because this is where it shines most.
+So the test is to basically use these to implement strlen() - use the
+decoders to iterate over the characters one at a time, doing nothing
+but incrementing a counter.
+
+The tests were run on two sets of data - ''The Hound of the
+Baskervilles'' from [[wp:Project Gutenberg]], and a sampling from
+[[wp:EDICT]] with the English stripped out, resulting in mostly 3 byte
+characters.  Each file was loaded into memory, and then "counted"
+10,000 times.  The program was compiled with gcc -03 letting it inline
+the functions.  The results are as follows, with times given in
+seconds.
+
+{| class="datatable"
+|-
+|    function        ||  ASCII   ||  EDICT
+|-
+|  read_utf8_char0   ||  4.199s  ||  15.132s
+|-
+|  read_utf8_char1   ||  26.593s ||  19.898s
+|-
+|  read_utf8_char2   ||  47.301s ||  34.623s
+|-
+|  read_utf16_char0  ||  10.849s ||  8.111s
+|-
+|  read_utf16_char1  ||  14.916s ||  11.165s
+|-
+|  read_utf32_char0  ||  4.037s  ||  3.018s
+|}
+
+To be honest, this really surprised me.  I was too clever for my own
+good, and the branchless versions turned out much slower than the
+conditional versions.  I did expect branch prediction to make the
+conditional versions faster for ASCII, but I thought they would become
+slower for text with mixed byte lengths.{{None of the data was outside
+the BMP, so we didn't really test the branching on UTF-16, but this is
+realistic since in practice surrogates are fairly rare.}}  It turns
+out all the extra operations were just too expensive.
+
+The other thing to observe is that, when comparing the "good" versions
+of the functions, there really isn't all that much difference either
+way.  UTF-8 is roughly just as fast as UTF-32 for mostly ASCII text,
+varying up to at most 5 times slower for mixed text.  UTF-16 is about
+2-3 times slower than UTF-32 in either case, and is actually slower
+than UTF-8 for ASCII.  And this is for a noop loop - in practice, the
+decoding cost will be dwarfed by whatever you're actually doing with
+the character.  So for next time, we'll look at some higher-level
+algorithms that actually do something.
+
