@@ -382,6 +382,12 @@
                                (display id out)
                                (display space out))))))))))
                    (highlight))
+                 ((#\<)
+                  (display "&lt;" out)
+                  (highlight))
+                 ((#\&)
+                  (display "&amp;" out)
+                  (highlight))
                   (else
                    (cond
                     ((char-c-initial? c)
@@ -433,6 +439,12 @@
                  (highlight))
                 ((#\;)
                  (highlight-class 'comment (read-to-eol (list c)) out)
+                 (highlight))
+                ((#\<)
+                 (display "&lt;" out)
+                 (highlight))
+                ((#\&)
+                 (display "&amp;" out)
                  (highlight))
                 (else
                  (write-char c out)
