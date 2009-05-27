@@ -9,16 +9,18 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(require-library autoload tcp hato-mime)
+(require-library autoload srfi-1 tcp hato-mime)
 
 (module hato-pop
   (pop3-connect pop3-disconnect pop3-open pop3-open-ssl pop3?
    pop3-apop pop3-auth pop3-dele pop3-disconnect
    pop3-list pop3-noop pop3-open pop3-pass pop3-quit
    pop3-retr pop3-rset pop3-stat pop3-top pop3-uidl pop3-user
-   pop3-resp pop3-retr->string pop3-top->string pop3-headers)
+   pop3-resp pop3-retr->string pop3-top->string pop3-headers
+   call-with-pop3-message call-with-pop3-top)
 
-(import scheme chicken extras utils ports data-structures srfi-1  tcp autoload hato-mime)
+(import scheme chicken extras utils ports data-structures srfi-1)
+(import tcp autoload hato-mime)
 
 (autoload openssl ssl-connect)
 (autoload hato-md5 md5-digest)
@@ -186,20 +188,21 @@
         (i 2)
         (len 0))
     (define (fill-buffer!)
-      (let ((line (read-line in)))
-        (cond
-         ((or (eof-object? line) (equal? "." line))
-          (set! buf #f)
-          (set! i 2)
-          (set! len 0))
-         ((and (not (equal? "" line)) (eqv? #\. (string-ref line 0)))
-          (set! buf (substring line 1))
-          (set! i 0)
-          (set! len (string-length buf)))
-         (else
-          (set! buf line)
-          (set! i 0)
-          (set! len (string-length line))))))
+      (if buf
+          (let ((line (read-line in)))
+            (cond
+             ((or (eof-object? line) (equal? "." line))
+              (set! buf #f)
+              (set! i 2)
+              (set! len 0))
+             ((and (not (equal? "" line)) (eqv? #\. (string-ref line 0)))
+              (set! buf (substring line 1))
+              (set! i 0)
+              (set! len (string-length buf)))
+             (else
+              (set! buf line)
+              (set! i 0)
+              (set! len (string-length line)))))))
     (define (read-char)
       (cond ((< i len) (set! i (+ i 1)) (string-ref buf (- i 1)))
             ((= i len) (set! i (+ i 1)) #\return)
