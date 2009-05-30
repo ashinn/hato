@@ -361,7 +361,7 @@
                              (last-fetch ,(current-seconds))
                              (failures ,failures)
                              (deleted ,del-count)
-                             (last-id ,n)
+                             (last-id ,(and del-count (- n del-count)))
                              ,@(if (and (= n limit) limit-uid)
                                    `((last-uid ,limit-uid))
                                    '())
@@ -424,13 +424,16 @@
                             (else 0))
                          (exn () #f))))
                   (condition-case (pop3-disconnect pop) (exn () #f))
-                  (save (- limit del-count) del-count)
+                  (save limit del-count)
                   res))
                (else
                 (let ((text
                        (condition-case (pop3-retr->string pop i)
                          (exn ()
-                              (log-error "couldn't retrieve ~S" i)
+                              (log-error "couldn't retrieve ~S: ~A" i
+                                         (call-with-output-string
+                                           (lambda (out)
+                                             (print-error-message exn out))))
                               #f))))
                   (if (not text)
                       ;; couldn't retrieve i, prematutely terminate

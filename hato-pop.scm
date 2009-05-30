@@ -54,7 +54,7 @@
         #f)))))
 
 (define (pop3-disconnect pop)
-  (let ((res (or (pop3-quit pop)
+  (let ((res (or (condition-case (pop3-quit pop) (exn () #f))
                  (begin (display "QUIT\r\n" (pop3-out pop)) #f))))
     (close-output-port (pop3-out pop))
     (close-input-port (pop3-in pop))
