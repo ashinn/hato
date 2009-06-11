@@ -296,6 +296,56 @@
             (highlight-class 'type id out))
            (else
             (display id out))))
+        (define (highlight-line)
+          (cond
+           ((eqv? #\# (peek-char in))
+            (highlight-start 'preprocessor out)
+            (write-char (read-char in) out)
+            (display (read-whitespace in) out)
+            (let ((id (read-identifier '())))
+              (display id out)
+              (highlight-end 'preprocessor out)
+              (display (read-whitespace in) out)
+              (cond
+               ((eq? 'define id)
+                (highlight-class
+                 'function
+                 (html-escape (read-to-whitespace in '()))
+                 out))
+               ((memq id '(include import))
+                (highlight-class
+                 'string
+                 (html-escape (read-to-whitespace in '()))
+                 out)))))
+           ((char-c-initial? (peek-char in))
+            ;; line beginning w/ an identifier is probably a
+            ;; function declaration
+            (let ((id1 (read-identifier '())))
+              (cond
+               ((eqv? #\: (peek-char in))
+                (highlight-class 'function id1 out))
+               (else
+                (let lp ((decls '())
+                         (id id1))
+                  (let ((space (read-whitespace in)))
+                    (cond
+                     ((char-c-initial? (peek-char in))
+                      (lp (cons space (cons id decls))
+                          (read-identifier '())))
+                     ((eqv? #\( (peek-char in))
+                      (highlight-start 'type out)
+                      (for-each (lambda (x) (display x out))
+                                (reverse decls))
+                      (highlight-end 'type out)
+                      (highlight-start 'function out)
+                      (display id out)
+                      (highlight-end 'function out)
+                      (display space out))
+                     (else
+                      (for-each write-identifier (reverse decls))
+                      (display id out)
+                      (display space out))))))))))
+          (highlight))
         (define (highlight)
           (let ((c (read-char in)))
             (if (eof-object? c)
@@ -333,61 +383,13 @@
                      (highlight)))
                   ((#\newline)
                    (newline out)
-                   (cond
-                    ((eqv? #\# (peek-char in))
-                     (highlight-start 'preprocessor out)
-                     (write-char (read-char in) out)
-                     (display (read-whitespace in) out)
-                     (let ((id (read-identifier '())))
-                       (display id out)
-                       (highlight-end 'preprocessor out)
-                       (display (read-whitespace in) out)
-                       (cond
-                        ((eq? 'define id)
-                         (highlight-class
-                          'function
-                          (html-escape (read-to-whitespace in '()))
-                          out))
-                        ((memq id '(include import))
-                         (highlight-class
-                          'string
-                          (html-escape (read-to-whitespace in '()))
-                          out)))))
-                    ((char-c-initial? (peek-char in))
-                     ;; line beginning w/ an identifier is probably a
-                     ;; function declaration
-                     (let ((id1 (read-identifier '())))
-                       (cond
-                        ((eqv? #\: (peek-char in))
-                         (highlight-class 'function id1 out))
-                        (else
-                         (let lp ((decls '())
-                                  (id id1))
-                           (let ((space (read-whitespace in)))
-                             (cond
-                              ((char-c-initial? (peek-char in))
-                               (lp (cons space (cons id decls))
-                                   (read-identifier '())))
-                              ((eqv? #\( (peek-char in))
-                               (highlight-start 'type out)
-                               (for-each (lambda (x) (display x out))
-                                         (reverse decls))
-                               (highlight-end 'type out)
-                               (highlight-start 'function out)
-                               (display id out)
-                               (highlight-end 'function out)
-                               (display space out))
-                              (else
-                               (for-each write-identifier (reverse decls))
-                               (display id out)
-                               (display space out))))))))))
+                   (highlight-line))
+                  ((#\<)
+                   (display "&lt;" out)
                    (highlight))
-                 ((#\<)
-                  (display "&lt;" out)
-                  (highlight))
-                 ((#\&)
-                  (display "&amp;" out)
-                  (highlight))
+                  ((#\&)
+                   (display "&amp;" out)
+                   (highlight))
                   (else
                    (cond
                     ((char-c-initial? c)
@@ -398,7 +400,7 @@
                     (else
                      (write-char c out)))
                    (highlight))))))
-        (highlight)))))
+        (highlight-line)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

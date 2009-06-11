@@ -1,5 +1,5 @@
 
-(use make extras)
+(use extras)
 
 (define version (call-with-input-file "VERSION" read-line))
 

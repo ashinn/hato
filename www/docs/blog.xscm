@@ -6,6 +6,16 @@
  hato-uri hato-config hato-http html-parser
  wiki-parse wiki-write wiki-utils)
 
+(define (get-timestamp file)
+  (let* ((mtime-file (pathname-replace-extension file ".ctime"))
+         (mtime (and (file-exists? mtime-file)
+                     (call-with-input-file mtime-file read))))
+    (if (number? mtime)
+        mtime
+        (let ((mtime (file-modification-time file)))
+          (call-with-output-file mtime-file (lambda (out) (write mtime out)))
+          mtime))))
+
 (define (display-timestamp mtime)
   (display "<small>posted by <a href=\"/wiki/users:foof\">foof</a> on ")
   (display (seconds->string mtime))
@@ -68,7 +78,7 @@
                           (a (@ (href "/wiki/users:foof")) "foof")
                           " on "
                           ,(seconds->string
-                            (file-modification-time
+                            (get-timestamp
                              (string-append mdir "/" f))))
                          ,(car (get-sxml wdir
                                          config

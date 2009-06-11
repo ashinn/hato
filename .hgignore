@@ -13,6 +13,7 @@ syntax: glob
 *.import.scm
 *.import.c
 *.pid
+*.ctime
 manual/hato-manual.html
 manual/hato-manual-Z-A.scm
 hato-mta
