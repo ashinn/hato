@@ -101,13 +101,23 @@
     (_
      (if (string? x) x ""))))
 
-;; removes ? help notes from wikipedia pages
+(define (question-mark-or-bracket-n? x)
+  (let ((y (string-trim-both (html-strip (sxml->html x)))))
+    (or (equal? y "")
+        (equal? y "?")
+        (and (eqv? (string-ref y 0) #\[)
+             (eqv? (string-ref y (- (string-length y) 1)) #\])
+             (string->number (substring y 1 (- (string-length y) 1)))))))
+
+;; removes ? help notes and [n] refs from wikipedia pages
 (define (html-remove-wiki-help x)
   (if (not (pair? x))
       x
       (match x
-        ((sup (a _ "?"))
-         "")
+        (('sup ls ...)
+         (if (question-mark-or-bracket-n? x)
+             ""
+             x))
         (_
          (cons (html-remove-wiki-help (car x))
                (html-remove-wiki-help (cdr x)))))))

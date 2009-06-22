@@ -24,7 +24,7 @@
 <input type=\"hidden\" name=\"domains\" value=\"synthcode.com\" />
 <input type=\"hidden\" name=\"sitesearch\" value=\"synthcode.com\" />
 </form>
-<small><a href=\"/feed.xscm\">feed</a></small>
+<small><a href=\"/blog/\">blog</a> <a href=\"/feed.xscm\">feed</a></small>
 </div>
 
 <div id=\"main\">

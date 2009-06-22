@@ -23,7 +23,7 @@ table { line-height: 1.3em; border: 0; table-layout: fixed; word-wrap: break-wor
 td { font-size: 12px; vertical-align: top; padding-bottom: 1em; }
 td.main { width: 460px; padding-left: 2em; padding-right: 7em; }
 td.doc { font-size: 10px; width: 200px; }
-td.note { font-size: 10px; padding-top: 2em; }
+td.note { font-size: 10px; padding-top: 2em; max-width: 300px; line-height: 1.6em; }
 td.note1 { color: #222222; font-size: 10px; padding-top: 2em; padding-right: 2em; }
 td.note2 { color: #444444; font-size: 10px; padding-top: 2em; padding-right: 2em; }
 td.note3 { color: #666666; font-size: 10px; padding-top: 2em; padding-right: 2em; }

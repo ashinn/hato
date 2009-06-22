@@ -1,0 +1,203 @@
+''Perfection is achieved, not when there is nothing more to add, but
+when there is nothing left to take away.''
+- [[wp:Antoine de Saint-Exupéry]]
+
+''The letter I have written today is longer than usual because I
+lacked the time to make it shorter.'' - [[wp:Blaise Pascal]]
+
+The purpose of art, be it a painting, a work of prose, or a musical
+composition, is to convey an idea or emotion, and a recurring theme
+thoughout history is minimalism - to convey that idea as simply as
+possible, without distracting the viewer with irrelevant details.
+Achieving this minimalism, however, is rarely as easy as it seems, and
+as the above authors suggest more often than not begins with something
+more complicated which must be trimmed down.
+
+To many, the abstract works of artists such as [[wp:Pablo Picasso]]
+look like something a child would draw.  However, in Picasso's
+[http://www.artyfactory.com/art_appreciation/animals_in_art/pablo_picasso/pablo_picasso.htm series of lithographs 'Bull'], he shows very clearly the
+steps he takes, beginning with a very realistic drawing of a bull,
+and gradually abstracting it.  In each of the eleven plates, he takes
+away more and more, until only the essence of the bull remains in a
+few simple lines.  If I had seen just the final plate by itself I
+would have thought nothing of it, but seeing the progression I could
+truly appreciate the work that went into reducing the bull to its
+essence.
+
+Mathematicians also have a notion of simplicity in the
+[[wp:Axiom|axioms]] that they use to prove their theorems.  Since an
+axiom by definition is taken for granted, it is desirable to minimize
+the number of axioms, using these axioms in turn to build up and prove
+other theorems.  For example, there are many sets of axioms which can
+be used to prove common-sense notions of [[wp:geometry]], but it was
+[[wp:Euclid]] who found that only five were needed from which
+everything else could be proved.  All five are necessary - take one
+away and you have [[wp:Non-Euclidean geometry]].
+
+It is not so immediately obvious how to draw these parallels to
+computer programming.  The equivalent to the axiom would be our
+definition of computation, such as a [[wp:Turing machine]] or the
+[[wp:Lambda calculus]], but few people write complex programs on
+Turing tape!  A more accurate analogy would be to compare a program to
+a mathematical proof, both of which are in a sense a form of
+structured prose.  Within proofs as well, mathematicians have a strong
+sense of elegance, and they sometimes refer to the ''Book Proof'' of a
+theorem as the most elegant possible proof for the theorem, which God
+himself keeps in a hypothetical book of all proofs.
+
+When you want to extend this concept to programming and the
+hypothetical ''Book Code'', it's important to remember that the axioms
+still matter, and just making the code as small as possible by using
+the language with the most features is not the answer.  The ''Book
+Proof'' takes into account also all the prerequisite knowledge that
+goes into understanding the proof.  It is often the case that a
+theorem can be proven trivially using more advanced math, but the
+proof that is the most elegant is the one which achieves the same
+results with simpler concepts.  For example, although the earlier
+proof of [[wp:Bertrand's postulate]] by [[wp:Srinivasa Ramanujan]] is
+in fact shorter when written out than the later proof by [[wp:Paul Erdős]],
+it is the latter which, using simpler ideas and a smaller sum total
+of knowledge, can be found in ''The Book''.
+
+In terms of programming languages, these ideals are best expressed by
+the introduction to the [[wp:R5RS]]:
+
+''Programming languages should be designed not by piling feature on
+top of feature, but by removing the weaknesses and restrictions that
+make additional features appear necessary.''
+
+With this philosophy, the authors of Scheme realized that they didn't
+need any looping syntax if they simply made the requirement that
+implementations perform tail-call optimization.  With this guarantee,
+anyone could write a macro to define their own looping construct and
+it would run just as fast as a native syntax.  Similarly, instead of
+threads or exceptions, Scheme provides first-class continuations on
+which they can be built.  The R5RS is a complete language
+specification written in an approachable manner and with sample code
+and reference implementations of all derived syntax in only 50 pages.
+It has its warts, but stands as a beautiful example of a minimalist
+language.
+
+The successor standard [http://www.r6rs.org/ R6RS] has, alas, strayed
+from its minimalist Scheme origins.  However, it has occurred to me
+that Schemers are too prone to infighting and too negative, and rather
+than attack what I dislike about R6RS, I've decided to celebrate what
+I like about R5RS.  So today I released version 0.2 of
+[http://synthcode.com/wiki/chibi-scheme Chibi-Scheme], my own attempt
+at a minimalist Scheme.  And through the process of working on Chibi,
+I've learned first-hand how true Saint-Exupéry's words are - every
+change begins with adding new code until I get the result I want, and
+then gradually refactoring and peeling away the code until only the
+essentials remain.  The new release includes a custom garbage
+collector, which during development grew to around 1000 lines, and now
+sits at just over 200 lines of code.  Chibi's size does not reflect
+any defects, nor was it inherently small from the start - it was the
+result of a continuous process of refinements.
+
+To give some idea of how small Chibi is in comparison to other
+languages, I've thrown together a table contrasting various language
+implementations.  Whereas most benchmarks compare how little time is
+used (speed) or how little memory is used, or in some cases how few
+lines of code a program can be written in, here I'm interested in how
+small the language implementation itself is.
+
+{| class="datatable"
+|-
+| Program  || Type    || C LOC   || Self LOC|| Exec ||  Lib
+|-
+| [[wp:TinyScheme]]     || interp  ||    4486 ||     452 ||  57K ||  69K
+|-
+| [http://synthcode.com/wiki/chibi-scheme Chibi-Scheme]    || VM      ||    4578 ||     609 ||  57K ||  87K
+|-
+| [[wp:Lua (programming language)]]      || VM      ||   12706 ||       0 || 142K || 225K
+|-
+| [http://www.jwdt.com/~paysan/gforth.html gforth]   || VM      ||    8501 ||   35758 ||  91K || 191K
+|-
+| [[wp:Scheme 48]] || VM      ||   12912 ||   76648 || 179K || 2.7M
+|-
+| [[wp:Chicken (Scheme implementation)]]  || native  ||    8216 ||   49762 || 1.3M || 3.3M
+|-
+| [[wp:GNU Guile|Guile]]    || interp  ||   72393 ||   19851 ||  13K || 825K
+|-
+| [[wp:Perl]]     || VM      ||  182268 ||  281184 || 1.3M ||    0
+|-
+| [[wp:Python (programming language)]]   || VM      ||  271109 ||  296215 ||  12K || 1.7M
+|-
+| [[wp:Glasgow Haskell Compiler|GHC]]      || native  ||   60271 ||  196205 ||      ||     
+|-
+| [[wp:GNU Compiler Collection|GCC]]      || native  || 2320134 ||       - ||      ||     
+|-
+| [[wp:OpenJDK|Java]]     || VM      ||  912126 || 2630009 ||      ||     
+|}
+
+This chart should be taken with an extra grain of salt, in addition to
+the grain of salt usually taken with benchmarks.  I used the
+[[wp:SLOCCount]] program to count the number of source lines, which is
+a debatable comparison but at least better than wc.  There's also a
+lot of room for difference in counting the core of the language
+vs. ''batteries included'' features, but seeing as how the languages I
+want to compare differ by '''orders of magnitude''' in size, we can
+afford to be approximate.  The ''C LOC'' refers to the number of lines
+of code written in C, and the ''Self LOC'' refers to lines written in
+the language itself.  ''Exec'' is the size of the compiled language
+executable, and ''Lib'' the size of the standard shared library (or
+image for Forth and Scheme48).
+
+All of the languages are general-purpose programming languages,
+suitable for a wide variety of applications, though there is a mix of
+pure interpreters, virtual machines, and native machine-code compilers
+as indicated.  There are several Scheme implementations included,
+specifically those implementations which have small size and
+simplicity (even by Scheme standards) as a primary goal.
+
+The first three languages, TinyScheme, Chibi-Scheme and Lua are all
+intended to be used as extension languages in larger programs.  For
+these first three only, the size of the executable is as a
+stand-alone, not linked against the library.  Tiny and Chibi are
+further compiled with -Oz {{the darwin equivalent of -Os}} and
+stripped, to get an idea of the overhead of embedding them directly
+into an application.  At thousands of lines of source, and 10K's of
+text size, these are truly small.  If you want to add scriptability
+to your application, you certainly can't reject either of these on the
+argument of size.  TinyScheme is extremely slow, however, even by
+scripting language standards, and it doesn't implement all of R5RS.
+Chibi-Scheme addresses these issues, but is still very young, and will
+likely be changing a lot in the near future.  Lua is a lightweight
+language, influenced in part by Scheme, but arguably less flexible as
+it lacks either macros or first-class continuations.  The Lua
+implementation weighs in at 2-3 times larger than Tiny and Chibi, but
+is still quite small compared to most software you might want to embed
+it in, and Lua has a sizable community and considerable success in
+video game scripting.
+
+GNU Forth and Scheme48 both use images for their custom VMs rather
+than shared libraries.  They are written primarily in themselves, with
+some minimal runtime written in C.  Chicken compiles Scheme to C code,
+giving it much better performance than any of the VMs on this list,
+but is still quite a small implementation, with an even smaller C
+runtime than GNU Forth or Scheme48.  Guile is a good bit larger than
+any of these, but still fits into the tens of thousands of lines
+category.
+
+At hundreds of thousands of lines we get the scripting languages, Perl
+and Python.  They both include a fair number of standard modules by
+default.
+
+The last three languages are the native-code compilers, which is a
+sort of apples-to-oranges comparison but I wanted to get another order
+of magnitude into the mix.  Since they compile applications separately
+and don't carry their own weight around with them, I'm leaving the
+executable and library size blank - for these, the size of the
+executables they generate would be a more meaningful comparison.
+Haskell is included as a more modern, less crufty comparison.  In code
+size it's in the same ballpark as the scripting languages, but its
+speed is closer to C and Java.  GCC and the Java OpenJDK are the first
+languages to reach millions of lines of code.  It's quite possible to
+make a smaller C compiler - the [[wp:Tiny C Compiler]], while
+incomplete in some ways, is only around 45kloc, while the Plan 9 C
+compiler is also in the tens of thousands of lines and gets production
+use.
+
+So that's my pointless comparison for the day - feel free to draw your
+own conclusions :)  And I'm sorry that this post was so long - I lacked
+the time to make it shorter.
