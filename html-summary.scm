@@ -18,10 +18,16 @@
            x
            (or (html-title (car x)) (html-title (cdr x))))))
 
+(define (html-non-empty? x)
+  (or (and (string? x) (string-any (lambda (c) (not (char-whitespace? c))) x))
+      (and (pair? x)
+           (any html-non-empty? (sxml-body x)))))
+
 (define (html-first-para x)
   (and (pair? x)
        (if (eq? 'p (car x))
-           x
+           (and (html-non-empty? x)
+                x)
            (or (html-first-para (car x))
                (html-first-para (cdr x))))))
 
