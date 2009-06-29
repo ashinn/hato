@@ -9,9 +9,9 @@ are already included directly in Gauche, and the list of Chicken
 extensions I've written can be found out at
 http://chicken.wiki.br/users/alex-shinn.
 
+* [[chibi-scheme]] - a very tiny Scheme implementation with decent speed and native hygienic macros
 * [[scheme-complete]] - intelligent Scheme tab-completion with type-inference for Emacs
 * [http://synthcode.com/scheme/irregex/ irregex] - a fully portable and efficient R[456]RS implementation of regular expressions
-* [[chibi-scheme]] - a very tiny Scheme implementation with decent speed and native hygienic macros
 * [http://synthcode.com/scheme/hato/doc/hato-manual.html hato] - a mail suite including [[wp:Mail transfer agent]], fetchmail replacement, multilingual spam classifier, Yahoo domain key verifier and other utilities
 * [http://synthcode.com/scheme/kishi.scm kishi] - a simple chess program with both [[wp:XBoard]] support and an ASCII interface with optional ANSI graphics and Unicode character chess pieces
 * [http://synthcode.com/scheme/fmt/ fmt] - extensible combinator-based text formatting
