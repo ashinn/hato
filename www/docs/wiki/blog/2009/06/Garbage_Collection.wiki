@@ -1,0 +1,170 @@
+
+I'm taking a break on the Unicode discussion, since it's not a
+particularly important part of my project.  The [[wp:Google Summer of Code]]
+project is really about [[wp:Plan 9 from Bell Labs|Plan 9]], and I'm only
+using Chibi-Scheme
+because it's small and has few dependencies.  However, it does have
+one dependency which is that it uses the [[wp:Boehm garbage collector]].
+I had initially thought it would be convenient not only for myself
+but for extension writers, but the size and complexity of the Boehm GC
+would make it a difficult task to port to Plan 9 - the GC itself is
+orders of magnitude larger than the rest of the Scheme implementation.
+{{The Boehm GC is nearly a 1MB tarball, whereas the entire rest of the
+Chibi-Scheme tarball including tests is less than 50kb.}}
+So at the advice of my mentors and others, I'm writing my own simple
+mark&sweep GC.  Once that's out of the way, I can move onto the real
+fun of playing with Plan 9.
+
+Among the many aspects of garbage collectors, one of the more
+important ones is precise vs. conservative.  A conservative GC (like
+Boehm), scans the entire C stack for any value that looks like a
+pointer into the heap, regardless of the type of the value (which of
+course it can't know).  It can therefore end up retaining objects that
+aren't really reachable, but it will never free a reachable object,
+hence then name conservative.  As the heap grows larger the chances of
+retaining unneeded objects increases, which is why most Lisp systems
+consider it important to implement a precise GC.  A precise GC knows
+the type of every object in the heap (through tagging or whatever type
+system you use), but must be told specifically what objects on the
+stack are potential pointers into the heap.
+
+In the most simple cases, you don't actually need to do anything
+special with the stack.  Consider the '''sexp_cons'''{{Schemes more
+commonly use a prefix of '''scm_''' or '''scheme_''' but Chibi was
+designed to have a stand-alone library for reading and writing
+[[wp:S-expression]]s, so I use the '''sexp_''' prefix.  Sexps are a
+general format used not only in Lisp but in [[wp:SPKI]] and
+[[wp:Natural Language Processing]].}}  function which implements the
+[[r5rs:cons]] primitive, the building block of linked lists.  This
+simply allocates space for a new cons cell (or pair) and sets the
+[[r5rs:car]] and [[r5rs:cdr]] (or head and tail) fields:
+
+  sexp sexp_cons (sexp ctx, sexp head, sexp tail) {
+    sexp pair = sexp_alloc_type(ctx, pair, SEXP_PAIR);
+    sexp_car(pair) = head;
+    sexp_cdr(pair) = tail;
+    return pair;
+  }
+
+'''ctx''' here is our context, which keeps track of the current stack
+and GC roots among other things.{{In an upcoming version it will also
+keep track of the heap, so instead of one global heap you can have
+multiple independent VMs running with their own heaps, potentially on
+their own native threads.}}  This gets passed to the primitive
+allocator '''sexp_alloc_type''' so that if we need to do a GC it can
+trace the roots properly.  In this case there are no temporary
+variables to keep track of - once the new object has been allocated,
+we just set the car and cdr and return it.  However, if you were to do
+something after allocating the pair that could trigger a GC, you need
+to tell the system about the pair so it doesn't get freed.  For
+example, there used to be a convenience macro '''sexp_list2''' for
+constructing a two element list as two pairs:
+
+  #define sexp_list2(x, a, b)  sexp_cons(x, a, sexp_cons(x, b, SEXP_NULL))
+
+Now if we trigger a GC on the second call to '''sexp_cons''' here, the
+first pair will have no references to it anywhere, and will be freed.
+The cdr of the result will then point to garbage, and some time later
+bad things will happen.
+
+So, instead sexp_list2 is a function which manually records the stack
+variables it uses:
+
+  sexp sexp_list2 (sexp ctx, sexp a, sexp b) {
+    sexp_gc_var(ctx, res, s_res);
+    sexp_gc_preserve(ctx, res, s_res);
+    res = sexp_cons(ctx, b, SEXP_NULL);
+    res = sexp_cons(ctx, a, res);
+    sexp_gc_release(ctx, res, s_res);
+    return res;
+  }
+
+The exact syntax is subject to change, but basically the
+'''sexp_gc_var''' macro declares '''res''' to be of type '''sexp'''
+and '''s_res''' to be a container type for it.  Specifically, it's a
+struct that looks like:
+
+  struct sexp_gc_var_t {
+    sexp *var;
+    struct sexp_gc_var_t *next;
+  };
+
+These structs form a linked list in the C stack, with the '''var'''
+fields pointing into the heap.  The head of the list is kept in the
+context.  When '''sexp_gc_preserve''' is called it pushes this local
+container into the context '''ctx''', with the address of '''res''' in
+'''var'' and a pointer to the old container found in '''ctx''' in the
+'''next''' field.  We can then bind '''res''' to any object and be
+sure it won't be freed.{{Note in this particular example we use the
+same variable twice, consing '''res''' onto itself.  This is a useful
+technique when building compound objects, but in this particular case
+since the second allocation is the last, the second result could have
+been bound to a separate, unprotected variable.}}  Finally,
+'''sexp_gc_release''' pops '''s_res''', restoring the old container.
+
+You need to be very careful when programming in this style not only to
+preserve every intermediate result, but to always release the
+preserved variables, which means never returning out of the middle of
+a function.{{This is arguably good style anyway.}}
+
+Debugging a GC is one of the most difficult things that I've ever had
+to do.  Any bug results in corrupted memory, so a symbolic debugger is
+pretty much useless - by the time you realize something is wrong, the
+original cause is ancient history, and there's nothing left over to
+inspect.  So you need a combination of strategic trace logs to see
+what's going on, and theory postulation and confirmation.  For
+example, when I got the first version of the mark&sweep routine
+running{{That is, after the real first version of the GC which
+naturally just kept allocating until it ran out of heap and then
+died.}}, some simple examples were working but others were
+failing.{{Fail pretty much always means segfault here.}}  I suspected
+the bug(s) were in the stack tracing logic described above, but needed
+to rule out bugs in the basic logic of marking and sweeping from the
+heap.  So I added tracing messages to print out every object that was
+kept in green, and every object freed in red.  Then I reduced the heap
+size so that the following example would trigger a GC:
+
+  (define (foo i r x)
+    (if (<= i 0)
+        r
+        (foo (- i 2) (cons i r) (cons (- i 1) '()))))
+  
+  (foo 100 '() '())
+
+This just builds a list of every even number from 0 to 100, while at
+the same time consing up single-element lists of all the odd numbers
+without keeping references to them.{{Keep in mind that Scheme requires
+proper [[wp:Tail recursion|tail call optimization]], so when we
+recurse here we overwrite the current call frame and the old values of
+'''i''', '''r''' and '''x''' are no longer on the stack.}}  When the
+GC is triggered we can get a good quick visual - in addition to making
+sure that the standard definitions and primitives aren't freed, we
+immediately know there's a problem if a list beginning with an odd
+number is kept (green), or a list beginning with an even number is
+freed (red).
+
+Other utilities confirm various invariants.  For instance,
+'''validate_free_list''' ensures that the free list is connected, and
+all the free chunks are properly aligned and in order and inside the
+heap.  '''validate_heap''' scans the heap to make sure every object
+has a valid type.  '''validate_gc_vars''' scans through the
+'''sexp_gc_var_t''' linked list to make sure every next pointer stays
+within the C stack and every variable points to a valid heap object.
+For testing purposes these can all be run, say, before and after every
+allocation.  Since the heap is kept small for most testing this isn't
+terribly slow.
+
+These have helped me track down several bugs, and for simple examples
+like the above the GC is quite solid and can stand all the stress
+tests I throw at it.  However, some other library functions written in
+C{{unfortunately including [[r5rs:load]] which we need to load the
+initialization file}} still have bugs, most likely in the logic
+preserving stack variables.  To help trace these bugs, I've added
+another hook, such that whenever an object is freed, we scan the C
+stack and warn if there any references to the object are found.  Thus
+it is temporarily a hybrid precise and conservative garbage collector.
+
+Working out these remaining bugs looks like it's going to be tedious,
+so for a change of pace next I'm just going to bump up the initial
+heap size and start running simple examples that won't trigger a GC on
+Plan 9.

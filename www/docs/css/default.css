@@ -1,0 +1,46 @@
+body { background-color: white; color: black; font-size: 12px; font-family: verdana, "trebuchet MS", helvetica, sans-serif;}
+.keyword { color: #800080; background-color: inherit; }
+.function { color: #0000FF; background-color: inherit; }
+.variable { color: #B8860B; background-color: inherit; }
+.type { color: #008000; background-color: inherit; }
+.attribute { color: #FF5000; background-color: inherit; }
+.character { color: #0055AA; background-color: inherit; }
+.builtin { color: #FF00FF; background-color: inherit; }
+.comment { color: #FF0000; background-color: inherit; }
+.string { color: #BC8F8F; background-color: inherit; }
+.preprocessor { color: #FF00FF; background-color: inherit; }
+.syntaxerror { color: #FF0000; background-color: inherit; }
+.diff-deleted { color: #5F2121; background-color: inherit; }
+.diff-added { color: #215F21; background-color: inherit; }
+span.paren1 { color: #AAAAAA; background-color: inherit; }
+span.paren2 { color: #888888; background-color: inherit; }
+span.paren3 { color: #666666; background-color: inherit; }
+span.paren4 { color: #444444; background-color: inherit; }
+span.paren5 { color: #222222; background-color: inherit; }
+span.paren6 { color: #000000; background-color: inherit; }
+.notelink { color: #666666; }
+table { line-height: 1.3em; border: 0; table-layout: fixed; word-wrap: break-word; }
+td { font-size: 12px; vertical-align: top; padding-bottom: 1em; }
+td.main { width: 460px; padding-left: 2em; padding-right: 7em; }
+td.doc { font-size: 10px; width: 200px; }
+td.note { font-size: 10px; padding-top: 2em; max-width: 300px; line-height: 1.6em; }
+td.note1 { color: #222222; font-size: 10px; padding-top: 2em; padding-right: 2em; }
+td.note2 { color: #444444; font-size: 10px; padding-top: 2em; padding-right: 2em; }
+td.note3 { color: #666666; font-size: 10px; padding-top: 2em; padding-right: 2em; }
+td.note4 { color: #888888; font-size: 10px; padding-top: 2em; padding-right: 2em; }
+td.note5 { color: #AAAAAA; font-size: 10px; padding-top: 2em; padding-right: 2em; }
+td.note6 { color: #CCCCCC; font-size: 10px; padding-top: 2em; padding-right: 2em; }
+td.reply { font-size: 10px; padding-top: 2em; padding-left: 5em; }
+a { color: #888888; }
+a:hover { color: #CC0000; }
+pre a { text-decoration: none; color: inherit; }
+pre { line-height: 1.2em; }
+li { padding-bottom: 1em; }
+div#header { font-size: 20px; padding-left: 140px; padding-top: 1em; padding-bottom: 1em; width: 70%; float: left; }
+#header small { font-size: 11px; }
+div#controls { padding-top: 1em; padding-bottom: 1em; float: right; }
+div#main { clear: left; }
+div#footer { clear: left; height: 80px; }
+div#copyright { text-align: center; font-size: 10px; }
+table.datatable { border-collapse: collapse; border: 1px solid; line-height: 1em; text-align: center; }
+table.datatable td { border: 1px solid; padding-top: 0.5em; padding-left: 1em; padding-right: 1em; }

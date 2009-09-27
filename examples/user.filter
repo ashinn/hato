@@ -1,0 +1,17 @@
+;; sample ~/.hato/filter file               -*- mode: scheme -*-
+
+;; initial duplicate & spam checks
+(cond
+  ((is-duplicate?)
+   (print "discarding duplicate: " (Message-Id))
+   (discard))
+  ((not (white-list?))
+   (cond
+     ((not (domain-key-verify))    (refuse))
+     ((> (spam-probability) 0.90)  (refuse))
+     ((> (spam-probability) 0.60)  (return "spam"))
+     (else (white-list)))))
+
+;; manual filtering & folder handling, etc.
+(cond
+  ((member "my-mail-list@nosuchdomain.comm" (To)) "my-mail-list"))

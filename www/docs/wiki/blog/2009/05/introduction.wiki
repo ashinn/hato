@@ -1,0 +1,25 @@
+
+Well, I've finally succumbed and started a [[wp:blog]].  This has been
+on my todo list for years now, but naturally I didn't want to use any
+existing blogging software so I had to write my own, which meant I
+needed to write my own web framework, which meant I needed to rewrite
+my [[wp:HTTP]] server from scratch (again).  But I'm happy with the new
+design, which is even more austere than before, forcing me to focus on
+the content itself.  I'm especially happy with the new margin-based
+annotations which will make reading and navigation much simpler.{{I
+have discovered a truly marvellous proof of this, which this margin is
+too narrow to contain.}}
+
+Anyway, it's basically working now, and hopefully I'll have some
+interesting posts to make in the near future.  There are a number of
+technical posts I've been wanting to write and simply haven't for lack
+of a decent venue, and the first article should be out this evening.
+From time to time I may also include some non-technical posts - random
+musings on politics or travels or my life in [[wp:Japan]].  In
+particular, now that I have a driver's license and highway travel is
+so cheap here{{The prime minister has reduced tolls drastically as one
+of several steps aimed at stimulating the economy.
+[http://uk.reuters.com/article/oilRpt/idUKT2250120090327 (reuters)] }}
+I'm trying to see more of the surrounding country.
+
+Enough blabbering... I need to get back to real work!
