@@ -15,7 +15,8 @@ syntax: glob
 *.pid
 *.ctime
 *.c
-manual/hato-manual.html
+*.hlog
+manual/hato-manual*.html
 manual/hato-manual-Z-A.scm
 hato-mta
 hato-fetch
