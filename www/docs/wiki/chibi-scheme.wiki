@@ -1,27 +1,35 @@
 Minimal Scheme Implementation for use as an Extension Language
 
-Download: [http://synthcode.com/scheme/chibi-scheme-0.2.tgz version 0.2]
+Download: [http://chibi-scheme.googlecode.com/files/chibi-scheme-0.3.tgz version 0.3]
 
 Chibi-Scheme is a very small but mostly complete R5RS Scheme
-implementation using a reasonably fast custom VM.  Chibi-Scheme tries
-as much as possible not to trade its small size by cutting corners,
-and provides full continuations, both low and high-level hygienic
-macros based on syntactic-closures, string ports and exceptions.
-Chibi-Scheme is written in highly portable C and supports multiple
-VM instances to run simultaneously.
+implementation using a reasonably fast custom VM.  Chibi-Scheme
+tries as much as possible not to trade its small size by cutting
+corners, and provides full continuations, both low and
+high-level hygienic macros based on syntactic-closures, string
+ports and exceptions. Chibi-Scheme is written in highly portable
+C and supports multiple VM instances running simultaneously.
+
+Chibi-Scheme is known to work on 32 and 64-bit Linux and OS X,
+and Plan9, and has been embedded in an iPhone app.
+
+The project home is at [http://code.google.com/p/chibi-scheme/]
+and mailing list at [http://groups.google.com/group/chibi-scheme].
+
+
+------------------------------------------------------------------------
+INSTALLING
 
 To build, just run "make".  This will provide a shared library
 "libchibi-scheme", as well as a sample "chibi-scheme" command-line
 repl.  The "chibi-scheme-static" make target builds an equivalent
-static executable.  Use "make install" to install, and "make
-uninstall" if you change your mind and decide you can't spare the 100k
-of disk space.
+static executable.
 
-You can edit the file config.h for a number of settings, mostly
-disabling features to make the executable smaller.  You can specify
-standard options directly as arguments to make, for example
+You can edit the file chibi/features.h for a number of settings,
+mostly disabling features to make the executable smaller.  You can
+specify standard options directly as arguments to make, for example
 
-  make CFLAGS=-Os
+  make CFLAGS=-Os CPPFLAGS=-DSEXP_USE_NO_FEATURES=1
 
 to optimize for size, or
 
@@ -30,21 +38,11 @@ to optimize for size, or
 to compile against a library installed in /usr/local.
 
 By default Chibi uses a custom, precise, non-moving GC.  You can link
-against the Boehm conservative GC by editing the config file, or
+against the Boehm conservative GC by editing the features.h file, or
 directly from make with:
 
-  make USE_BOEHM=1
+  make SEXP_USE_BOEHM=1
 
-See the file main.c for an example of using chibi-scheme as a library.
-More detailed documentation will be available in an upcoming release,
-for now the essential functions to remember are:
-
-  /* create a new context */
-  sexp_make_context(NULL, NULL, NULL)
-  
-  /* evaluates an s-expression */
-  sexp_eval(context, expr)
-  
-  /* reads an s-expression from str and evaluates it */
-  sexp_eval_string(context, str)
+Additional information can be found in the README included
+in the distribution.
 
