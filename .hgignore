@@ -24,9 +24,7 @@ hato-classify
 hato-cat
 hato-grep
 hato-httpd
-www/docs/code
-www/docs/emacs
-www/docs/scheme
+www
 
 syntax: regexp
 (^|/)roots/[^/]*/root/(var|home)($|/)
