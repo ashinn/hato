@@ -5,7 +5,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(require-library extras posix regex tcp tcp-server let-keywords)
+(require-library extras posix regex tcp let-keywords)
 
 (module hato-daemon
 (pid->cmdline running-process-id? run-tcp-server daemonize daemon-kill)
