@@ -1,0 +1,579 @@
+\magnification\magstephalf
+
+\input tex2page
+
+\let\q\scm
+\def\newsection{\htmlpagebreak\section}
+
+\title{Hato Mail Suite}
+
+\byline{\urlh{http://synthcode.com/}{Alex Shinn}}
+%\byline{\urlh{mailto:alexshinn@gmail.com}{alexshinn@gmail.com}}
+\byline{\urlh{http://synthcode.com/scheme/hato/hato-0.3.5.tar.gz}{\htmlonly Download
+\endhtmlonly Version 0.3.5 }}
+
+\bigskip
+
+\n
+Hato is a Mail Transfer Agent with powerful integrated spam detection
+and filtering capabilities.  Currently it supports the following
+features:
+
+\begin{itemize}
+\item Verify Yahoo Domain Keys
+\item Real-time black lists
+\item User-configurable filters, a superset of RFC3028 in Scheme
+\item Integrated multilingual Markovian spam filter
+\item Save mail to mbox, MH or maildir formats
+\end{itemize}
+
+\beginsection Contents
+
+\tableofcontents
+
+\newsection{Installation}
+
+Hato is developed with the latest version of Chicken, available from
+
+  \urlh{http://www.call-with-current-continuation.org/}{http://www.call-with-current-continuation.org/}
+
+Hato has some prerequisites available from Chicken's free library
+repository.  If you don't have them already, you can install them all
+with the following command:
+
+  \verb{# chicken-setup gdbm tcp-server autoload charconv sandbox numbers}
+
+Optionally, if you need SSL access or want to specify passwords on
+the command-line you should install the following two extensions:
+
+  \verb{# chicken-setup openssl stty}
+
+You can then compile and install hato with the following:
+
+  \verb{
+  $ make
+  $ sudo make install
+}
+
+You could also run directly from the source directory, skipping the
+"make install" step.  Note this step currently just copies into
+/usr/local/bin/ - it doesn't setup init scripts or otherwise interfere
+with any existing mail server.
+
+\newsection{Usage}
+
+Currently there are two executables hato-mta and hato-classify.
+
+\subsection{hato-mta}
+
+Hato is still in early beta, so you probably won't want to run it as
+your primary mail server yet.  If you run as a non-root user it will by
+default start up on port 5025, otherwise as root it starts on the
+standard port 25.  You can also specify the port with the \verb{--port}
+option.  The default mail spool directory is /var/mail/ for root, and
+\$HOME/hato/var/mail/ for non-root users.
+
+You can interactively in a REPL fashion by specifying the \verb{--test}
+option.  This handles a single non-threaded SMTP session from standard
+input, and provides the additional \verb{EVAL} SMTP command to evaluate
+arbitrary Scheme expressions:
+
+  \scm{  EVAL (set! log-level (+ 1 log-level))}
+
+A single file-name argument may be provided in test-mode which will then
+be used instead of standard input for batch tests.  The \verb{--debug}
+option will make hato-mta output more verbose debugging information.
+
+\subsection{hato-classify}
+
+hato-classify is a stand-alone adaptive spam classifier which can use a
+number of different probabilistic methods, including Markov chains (the
+default) and naive Bayesian probability.  It uses the same libraries and
+can use the same database file as the spam filtering provided by
+hato-mta.
+
+The two basic modes of operations are:
+
+  \verb{hato-classify -exit-code}
+
+    Filters standard input and exits with a return value of 0 if not
+    spam and 1 if spam, compatible with many other filter.
+
+  \verb{hato-classify -insert-header}
+
+    Filters standard input and prints it back to standard output with
+    two MIME headers inserted as follows:
+
+  \verb{
+      X-Spam-Classification: [HAM or SPAM]
+      X-Spam-Probability: 0.5
+}
+
+See \verb{hato-classify -help} for more information.
+
+\newsection{Configuration}
+
+Hato tries to provide reasonable defaults for both root and non-root
+users.  System-wide aliases may be provided in the standard /etc/aliases
+file, and user filters in the user's ~/.hato/filter file as described in
+the next sections.
+
+Many other options may be specified both via command-line options and
+the config file (/etc/hato/config.scm for root and ~/hato/etc/config.scm
+for non-root users).  The config file is simply a (non-dotted) alist
+mapping the command-line option to the value (or to #t/#f for boolean
+options).
+
+Since the options themselves are changing rapidly at this point, full
+documentation of them will be forthcoming in a later version.
+
+\newsection{System Filters}
+
+When a mail is received, the system first consults the virtual aliases
+file (found in /etc/{hato,mail}/virtual), followed by the /etc/aliases
+file.  If no expansion is not found (or the expansion results in the
+same local user) then we fall back on the Hato system-wide filter, a
+Scheme script in /etc/hato/filter.  This uses the same semantics as
+the user filters in the next section, except that any result
+indicating a non-email address string is taken to be a local user
+rather than a mailbox name.
+
+\newsection{User Filters}
+
+The filter is located in the user's ~/.hato/filter file.  It is
+evaluated as Scheme script in a restricted environment with various
+procedures acting on a default (current-mail) object.  The final result
+should be either a string or list or strings indicating mail
+destinations.
+
+If the final result is false or undefined the mail is delivered to
+(default-folder).  Likewise if any errors occur they will be caught,
+logged, and the mail delivered to (default-folder).
+
+You may return a result immediately with the escape continuation bound
+to 'return'.
+
+During execution of the filter anything written to (current-output-port)
+is logged to ~/.hato/filter.log.
+
+If the user's ~/.hato/filter is not found, then processing proceeds to
+the user's ~/.forward.  This may either be an /etc/aliases list of
+addresses to forward to, or an RFC 3028 Sieve filter script.  To
+enable the latter, first line should be a # comment including the word
+``Sieve'' (this is compatible with the Exim implementation).  See
+\urlh{http://www.faqs.org/rfcs/rfc3028.html}{http://www.faqs.org/rfcs/rfc3028.html}
+for more details.
+
+\subsection{Filter Language}
+
+Currently the filter environment includes all of R5RS (except LOAD,
+TRANSCRIPT-ON/OFF and the default environments), and is specifically
+case-insensitive, even if the host Scheme implementation defaults to
+case-sensitive.  In addition, the following utilities are provided:
+
+\begin{itemize}
+\item \scm{(current-mail)}   - current mail object, implicit in most procedures
+\item \scm{(default-folder)} - default mail folder if not handled in filter
+
+\item \scm{(spam-probability)}  - probability from builtin filter
+\item \scm{(is-spam?)}          - #t iff probability is above default threshold
+\item \scm{(is-duplicate?)}     - #t iff we've already received this Message-Id
+
+\item \scm{(domain-key-verify [text])}  - #f on invalid keys (see domain-keys.scm)
+
+\item \scm{(headers)}       -  mail headers as an alist
+\item \scm{(header <name>)} -  fetch header by case-insensitive \scm{<name>}
+
+\item \scm{(Urls)}   - all urls found in message header or body
+\item \scm{(Emails)} - all emails found in message header or body
+\item \scm{(Ips)}    - all ip addresses found in message header or body
+
+%% convenience headers
+
+\item \scm{(Date)}            -  date of mail from Date or Envelope, default now
+\item \scm{(From)}            -  sender of mail, from Date or Envelope
+\item \scm{(To)}              -  all to addresses (parsed, including the addr only)
+\item \scm{(Cc)}              -  all cc recipients
+\item \scm{(To/Cc)}           -  all mail recipients
+\item \scm{(Subject)}         -  message subject
+\item \scm{(Mailer)}          -  User-Agent or X-Mailer
+\item \scm{(Message-Id)}      -  message ID
+\item \scm{(Content-Length)}  -  size of mail in bytes
+
+\item \scm{(From? [addrs ...])}  - true if the mail was sent From any of the addrs
+\item \scm{(To? [addrs ...])}  - true if the mail was sent To any of the addrs
+\item \scm{(Cc? [addrs ...])}  - true if the mail was Cc'ed to any of the addrs
+\item \scm{(To/Cc? [addrs ...])}  - true if the mail was sent or Cc'ed to any of the addrs
+
+%% string->object database routines
+
+\item \scm{(open-db file [read-only?])}
+\item \scm{(close-db db)}
+\item \scm{(db-ref db key [default])}
+\item \scm{(db-set! db key val)}
+\item \scm{(db-delete! db key)}
+
+%% convenience white/black lists using above databases (use string as
+%% you want, defaults to the value of (From))
+
+\item \scm{(white-list [string])}   - add to white-list
+\item \scm{(black-list [string])}   - add to black-list
+\item \scm{(white-list? [string])}  - check if in white-list
+\item \scm{(black-list? [string])}  - check if in black-list
+
+\item \scm{(auto-list [rename [my-addresses ...]])}  - automatically file into separate mailing-list archives by consulting the List-Id and X-Mailing-List headers
+
+%% from RFC3028
+%%\item \scm{(keep [mailbox])}
+\item \scm{(discard [reason])}      - discard the mail
+\item \scm{(reject [reason])}       - reject the mail at the SMTP protocol level
+
+%% from http://www.mvmf.org/docs/draft-elvey-refuse-sieve-01.txt
+\item \scm{(refuse [reason])}   - refuse the mail at the SMTP protocol level
+
+\end{itemize}
+
+\subsection{A Sample Filter}
+
+\scheme{
+;; initial duplicate & spam checks
+(cond
+  ((is-duplicate?)
+   (print "discarding duplicate: " (Message-Id))
+   (discard))
+  ((not (white-list?))
+   (cond
+     ((not (domain-key-verify))    (refuse))
+     ((> (spam-probability) 0.90)  (refuse))
+     ((> (spam-probability) 0.60)  (return "spam"))
+     (else (white-list)))))
+
+;; manual filtering & folder handling, etc.
+(cond
+  ((To? "my-mail-list@nosuchdomain.comm") "my-mail-list")
+  (else (auto-list)))
+}
+
+Note in the above filter the \scheme{To?} test is redundant if the
+List-Id header uses my-mail-list as the local part.  If you're using
+\scheme{auto-list} then the only reason to manually filter lists is if
+you want to specify alternate mailbox names.
+
+\newsection{Hato-fetch}
+
+Hato-fetch is a Swiss-Army knife tool for moving mail back and forth
+between different sources and formats, and optionally running in a
+daemon mode to periodically poll the same sources (i.e. it can do what
+fetchmail does - but better).
+
+The basic usage is like the Unix cp(1) command:
+
+  \verb{$ hato-fetch source1 source2 ... dest}
+
+This will copy all of the messages in each of the source folders to
+the final destination folder.  Folders may be actual local files (in
+any of mbox, mh or maildir format), or any of a number of URI schema,
+described in detail below.
+
+You can specify only one argument, and it will use the default
+destination, which is your default Hato MTA filter ~/.hato/filter, if
+that file exists, or otherwise your local mail spool.  This default
+filter can also be specified explicitly with the hato: URI, which
+you'll need if you want to fetch multiple sources into the default.
+
+If you specify zero arguments, then it uses the same default
+destination along with the default sources as specified in
+~/.hato/fetch/config.  This is the usual way to run like fetchmail.
+
+\subsection{Hato-fetch Usage}
+
+\begin{tabular}{l l l}
+  -h & --help             & print a help message and exit \\
+  -V & --version          & print version and exit \\
+  -c & --config=FILE      & specify config file (default ~/.hato/fetch/conf) \\
+     & --no-config        & don't use any config file \\
+  -n & --no-run           & trial run, verify servers but don't fetch \\
+  -d & --daemon           & run the command periodically as a daemon \\
+  -k & --kill             & kill running daemon \\
+  -i & --interval=N       & interval to use in seconds (default 60) \\
+     & --delete           & delete fetched messages (i.e. mv instead of cp) \\
+     & --delete-after=N   & delete old messages after N days \\
+  -f & --filter key[=val] & fetch only messages where the key (header) matches \\
+  -r & --remove key[=val] & exclude messages where the key (header) matches \\
+     & --cc=MBOX          & CC to an extra destination mbox \\
+     & --allow-relay      & enable relaying to external mail addresses \\
+\end{tabular}
+
+The options are fairly straightforward, and any potentially
+``dangerous'' options must be spelled out in full - there are no short
+forms.
+
+The --no-run option means to verify any POP or IMAP servers, prompting
+for a password if needed, and also checking mailboxes in the case of
+IMAP, but not to actually retrieve any messages.  It can be useful
+when you want to verify your configuration.
+
+--daemon repeats the request periodically in the given interval
+(identical to fetchmail), and --kill can be used to terminate a
+running daemon.
+
+--delete indicates to expunge any fetched messages from the source,
+effectively making the command behave like mv(1) rather than cp(1) -
+or even rm(1) if you use a null output destination.
+
+--delete-after removes old messages after a certain number of days.
+This can be useful if you want to keep messages on a server, for
+remote access or to enable fetching from multiple clients, but you
+want to avoid using up all the server space.
+
+--filter and --remove are analogues of the SRFI-1 procedures of the
+same names.  Only messages passing all filters and not removed by any
+of the removes will be fetched.  In the case of IMAP, some or all of
+the filtering may be handled server-side - otherwise we first fetch
+the message and then decide whether or not to keep it.  The keywords
+are testing for the (case-insensitive) values of MIME headers in the
+message, or simply the existence of the header if no value is
+specified.  Two special keywords are ``larger'' and ``smaller'' which
+instead act on the size of the message in bytes.  Other special
+keywords may be added later.
+
+--cc allows you to specify multiple outputs, since the syntax only
+allows one output by default.  It uses the general output URI syntax
+and is not limited to email addresses.
+
+--allow-relay is required if you want to specify an external email
+address as an output destination (or a result from Hato filtering).
+This is because it seems fetching {\em to} an address seems a somewhat
+uncommon case, and it would best to avoid accidentally spamming 5000
+messages from a local mail spool.  Local email addresses are always
+allowed as destinations, however.
+
+\subsection{Input Sources}
+
+\begin{tabular}{l l}
+  /path/to/file        & mbox, mh or maildir recognized \\
+  file:/path/to/file   & same as above \\
+  pipe:command         & use piped I/O to/from a command \\
+  |command             & same as above \\
+  alias:name           & a named mbox from the config file \\
+  :name                & same as above \\
+  imap[s]://user@host/[mailbox] & fetch from an IMAP server \\
+  pop[s]://user@host   & fetch from a POP server \\
+  test:[subject]       & generate a dummy message for testing \\
+  null:                & the bit bucket \\
+  -                    & stdin/stdout \\
+\end{tabular}
+
+Most of the inputs are straightforward.  pipe: will run the given
+command and copy the output to the destination(s).  If the output is
+not a valid message beginning with MIME headers, then it will
+automatically be encapsulated as a message with a Subject: line of
+``output of {\it command}''.
+
+An alias: source just refers to a named source defined in your config
+file, as explained below.
+
+The test: source just generates a time-stamped dummy message, which
+can be very handy for testing your output sources.  The null: source
+doesn't generate a message at all.
+
+imap: and pop: fetch from the given server with the IMAP and POP3
+protocols respectively, optionally over SSL if the trailing ``s'' is
+included in the URI scheme.  User defaults to the current user name.
+IMAP will by default fetch from the standard ``INBOX'' mailbox, but
+you may override this with a path specification after the host.  This
+may include IMAP mailbox patterns such as ``\%'' to fetch from all
+top-level mailboxes.  Both of these protocols will prompt for a
+password.
+
+\subsection{Output Sources}
+
+You can output to any of the input sources except for pop: (which
+doesn't allow uploading) and test: (which wouldn't make sense).  In
+addition, you can relay each fetched message to an email address with
+any of the following forms:
+
+\begin{tabular}{l l}
+ smtp:user@host & relay to an address (on a possibly remote host) \\
+ user@host      & same as above \\
+ smtp:[user]    & forward to local host \\
+\end{tabular}
+
+Note that to send to a remote host you need to specify the
+--allow-relay option.
+
+In the case of output filters, the pipe: schema has a default command
+of procmail(1), so just ``pipe:'' alone is allowed.
+
+\subsection{Hato-fetch Comand-line Examples}
+
+\begin{itemize}
+
+\item Convert from mbox format to maildir:
+
+\verb{$ hato-fetch mbox:foo maildir:bar}
+
+\item Move from POP to IMAP:
+
+\verb{$ hato-fetch pop3://me@pop.myhost.com imaps://me@imap.myhost.com}
+
+\item  Fetch the message with the given message-id over IMAP and write it to standard output:
+
+\verb{$ hato-fetch -f 'Message-Id=<blah>' imaps://me@imap.myhost.com -}
+
+\item Encapsulate the host information in a message:
+
+\verb{
+$ ./hato-fetch.scm pipe:uname%20-a -
+Message-Id: <1201854657.76446.g185@chernushka>
+From: foof@chernushka
+To: foof@chernushka
+Subject: output of uname -a
+Date: Fri Feb  1 17:30:57 2008
+Mime-Version: 1.0
+Content-Type: text/plain
+
+Darwin chernushka 9.1.0 Darwin Kernel Version 9.1.0: Wed Oct 31 17:46:22 PDT 2007; root:xnu-1228.0.2~1/RELEASE_I386 i386
+}
+
+\item Split a mailbox in two, moving everything from a specified mailing list into a separate folder:
+
+\verb{$ hato-fetch --delete -f List-Id=chicken-users ~/Mail/inbox ~/Mail/chicken }
+
+\end{itemize}
+
+\subsection{Hato-fetch Config}
+
+The configuration for hato-fetch is in ~/.hato/fetch/config (unless
+specified otherwise with the --config option).  This file should just
+hold a single alist.  The recognized keywords are:
+
+\begin{tabular}{l l}
+\scheme{auto} & a list of sources to poll by default \\
+\scheme{interval} & the polling interval \\
+\scheme{default-format} & the format to use for newly created folders, either \scheme{'mbox} or \scheme{'mh} or \scheme{'maildir} \\
+\scheme{smtp-host} & the default outgoing smtp-host \\
+\scheme{debug?} & log debug information \\
+\scheme{no-flag-seen?} & don't flag IMAP messages as seen after you fetch them \\
+\scheme{sources} & an alist of sources and their configurations \\
+\scheme{destination} & the default output (as a URI, symbol alias or source-style specification) if the user has no ~/.hato/filter file \\
+\end{tabular}
+
+The URI's you can use on the command-line are just a convenient
+shorthand for the \scheme{sources} list in your config file.  These
+source specifications allow more options.  The one required keyword
+for any mail source is the protocol (equivalent to the URI scheme).
+Other keywords include:
+
+\begin{tabular}{l l}
+\scheme{host} & the host for POP3, IMAP and other network protocols \\
+\scheme{port} & the port number if different from the protocol's default \\
+\scheme{username} & the username used for authentication \\
+\scheme{password} & the password (will prompt at startup if missing) \\
+\scheme{mailboxes} & a list of mailboxes for IMAP servers \\
+\scheme{delete} & remove fetched messages from this source like --delete \\
+\scheme{delete-after} & remove old messages from this source \\
+\scheme{interval} & override the default interval \\
+\scheme{filter} & an alist of (header-symbol value-string) filters \\
+\scheme{remove} & an alist of (header-symbol value-string) filters \\
+\end{tabular}
+
+The \scheme{mailboxes} keyword takes a list of mailbox pattern names
+as strings, and also allows a list of the form \scheme{(except mailbox
+  ...)}.  For example, if you want to fetch {\em all} of you mailboxes
+from Gmail, you might notice:
+
+\verb{
+$ ./hato-fetch.scm -n imaps://me@gmail.com@imap.gmail.com/\*
+Password for me@gmail.com@imap.gmail.com: 
+[2008/01/01 (Fri) 18:14:24] [notice] polling imaps://me@gmail.com@imap.gmail.com ("Chicken" "INBOX" "[Gmail]" "[Gmail]/All Mail" "[Gmail]/Drafts" "[Gmail]/Sent Mail" "[Gmail]/Spam" "[Gmail]/Starred" "[Gmail]/Trash")
+}
+
+Oops, we certainly don't want to fetch all those folders, especially
+the "Spam" that Google so thoughtfully filtered for us, and "All Mail"
+that will just contain duplicates of all the other folders.
+
+Now, a \verb{*} in an IMAP basically means the \verb{.*} regexp,
+whereas \verb{%} means to only match at the current level,
+like \verb{[^/]*}.  So if we try that we see:
+
+\verb{
+$ ./hato-fetch.scm -n imaps://me@gmail.com@imap.gmail.com/%25
+Password for me@gmail.com@imap.gmail.com: 
+[2008/01/01 (Fri) 18:14:24] [notice] polling imaps://me@gmail.com@imap.gmail.com ("Chicken" "INBOX" "[Gmail]")
+}
+
+That's better.  There's still the pesky "[Gmail]" folder, but that's
+set to non-selectable on the Gmail IMAP server, so all it will do is
+log an error when it tries that and continue processing.  However, if
+we used a config rule of
+
+  \scheme{(mailboxes "%" (except "[Gmail]*"))}
+
+then the folder would be filtered out to begin with.
+
+\subsection{Sample hato-fetch Config}
+
+\scheme{
+;; -*- scheme -*-
+
+((auto gmail school)
+ (default-format maildir)
+ (interval 300) ; 5 minutes
+ (sources
+  (gmail
+   (protocol imaps)
+   (host "imap.gmail.com")
+   (username "me@gmail.com")
+   (password "secret")
+   (mailboxes "%" (except "[Gmail]*"))
+   )
+  (school
+   (protocol pop3)
+   (host "alma-mater.edu")
+   (password "sesame")
+   (delete-after 28)     ; expunge old mails from server after 28 days
+   (interval 3600)       ; low priority, fetch only once an hour
+   )
+  (old-work ; not in auto so not fetched by default
+   (protocol pop3)
+   (host "somewhere.com")
+   (username "me"))
+  ))
+}
+
+\newsection{Library Documentation}
+
+The following libraries are installed with Hato.  Complete
+documentation will be forthcoming, in the meantime there are usually
+more detailed summaries in the source.
+
+\begin{itemize}
+\item dns - DNS client library
+\item domain-keys - Yahoo DKIM library
+\item html-parser - an SSAX-like tree-folding HTML parser
+\item lru-cache - least-recently-used cache
+\item quoted-printable - RFC 2045 quoted-printable encoding
+\item user-env - run sandboxed code as a specified user (for root processes)
+\item hato-archive - mail archive (mbox, mh and maildir) utilities
+\item hato-base64 - fast base64 encoding with MIME header utilities
+\item hato-config - a config file library
+\item hato-daemon - tools to daemonize a process
+\item hato-date - date and time utilities
+\item hato-db - abstract a file database (currently wrapper around gdbm)
+\item hato-filter - general user mail filtering library
+\item hato-i3db - ``3-integer-key'' database
+\item hato-imap - extensive IMAP client library
+\item hato-mime - MIME library
+\item hato-nntp - NNTP news client library
+\item hato-pop - POP3 client library
+\item hato-prob - text classifier library
+\item hato-rfc3028 - Sieve user-level mail filter implementation
+\item hato-smtp - SMTP client library with easy send-mail utility procedure
+\item hato-spf - SPF (Sender Policy Framework) library
+\item hato-uri - URI parsing and manipulating library
+\end{itemize}
+
+
+\bye
+

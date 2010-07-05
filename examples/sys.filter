@@ -1,0 +1,35 @@
+;; /etc/hato/filter                            -*- mode: scheme -*-
+;;
+;; Standard HATO system-wide mail filter which uses /etc/hato/virtual as
+;; a virutal address list, mapping one regular expression per line to
+;; one or more addresses.
+;;
+;; Stores the entire file as a sequence of compiled regular expressions
+;; and lists of destination addresses, and performs no optimizations in
+;; common-patterns among regular expressions, such as pre-splitting on
+;; user and domain, so this filter is not appropriate for systems
+;; serving huge numbers of users or domains.
+;;
+;; To get Exim-like virtual hosts that would support any number of users
+;; you could simply (require-extension gdbm) and lookup the user@domain,
+;; @domain, and user keywords in succession.
+
+(with-input-from-file "/etc/hato/virtual"
+  (lambda ()
+    (let lp ((res '()))
+      (let ((line (read-line)))
+        (if (eof-object? line)
+          (let ((res (reverse res)))
+            ;; the returned system filter
+            (lambda (addr)
+              (let lp ((ls res))
+                (and (pair? ls)
+                     (or (and (string-match-positions (caar ls) addr) (cdar ls))
+                         (lp (cdr ls)))))))
+          (if (equal? line "")
+            (lp res)
+            (let ((ls (delete "" (string-split (car (string-split str "#"))))))
+              (if (pair? ls)
+                (lp (cons (cons (regexp (car ls) #t) (cdr ls)) res))
+                (lp res)))))))))
+

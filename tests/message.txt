@@ -1,0 +1,84 @@
+                                                                                                                                                                                                                                                               
+Delivered-To: alexshinn@gmail.com
+Received: by 10.140.125.17 with SMTP id x17cs476746rvc;
+        Sun, 6 Jan 2008 08:50:23 -0800 (PST)
+Received: by 10.150.178.6 with SMTP id a6mr5147725ybf.22.1199638222727;
+        Sun, 06 Jan 2008 08:50:22 -0800 (PST)
+Return-Path: <chicken-users-bounces+alexshinn=gmail.com@nongnu.org>
+Received: from lists.gnu.org (lists.gnu.org [199.232.76.165])
+        by mx.google.com with ESMTP id i52si3138102rne.2.2008.01.06.08.50.22;
+        Sun, 06 Jan 2008 08:50:22 -0800 (PST)
+Received-SPF: pass (google.com: domain of chicken-users-bounces+alexshinn=gmail.com@nongnu.org designates 199.232.76.165 as permitted sender) client-ip=199.232.76.165;
+Authentication-Results: mx.google.com; spf=pass (google.com: domain of chicken-users-bounces+alexshinn=gmail.com@nongnu.org designates 199.232.76.165 as permitted sender) smtp.mail=chicken-users-bounces+alexshinn=gmail.com@nongnu.org; dkim=neutral (body hash did not verify) header.i=@gmail.com
+Received: from localhost ([127.0.0.1] helo=lists.gnu.org)
+	by lists.gnu.org with esmtp (Exim 4.43)
+	id 1JBYha-00048J-4g
+	for alexshinn@gmail.com; Sun, 06 Jan 2008 11:50:22 -0500
+Received: from mailman by lists.gnu.org with tmda-scanned (Exim 4.43)
+	id 1JBYhT-00047m-B5
+	for chicken-users@nongnu.org; Sun, 06 Jan 2008 11:50:15 -0500
+Received: from exim by lists.gnu.org with spam-scanned (Exim 4.43)
+	id 1JBYhR-00046z-VI
+	for chicken-users@nongnu.org; Sun, 06 Jan 2008 11:50:15 -0500
+Received: from [199.232.76.173] (helo=monty-python.gnu.org)
+	by lists.gnu.org with esmtp (Exim 4.43) id 1JBYhR-00046w-Os
+	for chicken-users@nongnu.org; Sun, 06 Jan 2008 11:50:13 -0500
+Received: from rv-out-0910.google.com ([209.85.198.187])
+	by monty-python.gnu.org with esmtp (Exim 4.60)
+	(envelope-from <bunny351@gmail.com>) id 1JBYhR-0004cl-3u
+	for chicken-users@nongnu.org; Sun, 06 Jan 2008 11:50:13 -0500
+Received: by rv-out-0910.google.com with SMTP id g11so18462859rvb.22
+	for <chicken-users@nongnu.org>; Sun, 06 Jan 2008 08:50:10 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=gamma;
+	h=domainkey-signature:received:received:message-id:date:from:to:subject:mime-version:content-type:content-transfer-encoding:content-disposition;
+	bh=ilqo76Ki4b1LHrQwMUEiHU+rXQEsjHT0d7YvBCBqSVU=;
+	b=mIv0w4ZhZGY5odxdASldOGIOXJoBXyQp3R9gXb3u+SZcSz4jek/AZeoM5GIkq2pZUc2btggVV7FoI3Oq5JhQokTz6nm0gRL3DInc4ysNEq1EZiMyfTxdtEisZa0eSrwnk/VhdQaFvVHivNgB/GR/IaLcuASaNJ3bPeIQQhtZ1nY=
+DomainKey-Signature: a=rsa-sha1; c=nofws; d=gmail.com; s=gamma;
+	h=message-id:date:from:to:subject:mime-version:content-type:content-transfer-encoding:content-disposition;
+	b=SVAGg0xtspEW5uEJThSf/z1Av2ZCClsY4sdoh/KhqEkKdZNoJLqtjUGuqWcSHcxLkN5ZbCLcDpIJeBGSoiWh8/6PIpDPQNv9aOzp/46WayRC+XZ9zKa5Wq8CLAFUwMQfs6j9wKcduICLCO/H5Ilvmlbn75qOb5XZddTPyic8u9o=
+Received: by 10.141.185.3 with SMTP id m3mr10071278rvp.133.1199638210781;
+	Sun, 06 Jan 2008 08:50:10 -0800 (PST)
+Received: by 10.140.135.6 with HTTP; Sun, 6 Jan 2008 08:50:10 -0800 (PST)
+Message-ID: <bd22bd7a0801060850q6aae907em13deb752b7fc09bf@mail.gmail.com>
+Date: Sun, 6 Jan 2008 17:50:10 +0100
+From: "felix winkelmann" <bunny351@gmail.com>
+To: "chicken Users" <chicken-users@nongnu.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=ISO-8859-1
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+X-detected-kernel: by monty-python.gnu.org: Linux 2.6 (newer, 2)
+Subject: [Chicken-users] new eggs
+X-BeenThere: chicken-users@nongnu.org
+X-Mailman-Version: 2.1.5
+Precedence: list
+List-Id: chicken-users.nongnu.org
+List-Unsubscribe: <http://lists.nongnu.org/mailman/listinfo/chicken-users>,
+	<mailto:chicken-users-request@nongnu.org?subject=unsubscribe>
+List-Archive: <http://lists.gnu.org/pipermail/chicken-users>
+List-Post: <mailto:chicken-users@nongnu.org>
+List-Help: <mailto:chicken-users-request@nongnu.org?subject=help>
+List-Subscribe: <http://lists.nongnu.org/mailman/listinfo/chicken-users>,
+	<mailto:chicken-users-request@nongnu.org?subject=subscribe>
+Sender: chicken-users-bounces+alexshinn=gmail.com@nongnu.org
+Errors-To: chicken-users-bounces+alexshinn=gmail.com@nongnu.org
+
+Hi, folks!
+
+
+New eggs that have been added recently:
+
+srfi-34 (ref. implementation, ported to chicken by Ben Clark)
+srfi-89 (slightly optimized reference implementation)
+ioctl (by Alex Shinn)
+sbky (a minimalistic version control system, based on rsync(1))
+
+
+cheers,
+felix
+
+
+_______________________________________________
+Chicken-users mailing list
+Chicken-users@nongnu.org
+http://lists.nongnu.org/mailman/listinfo/chicken-users

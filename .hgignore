@@ -1,0 +1,31 @@
+syntax: glob
+*.rej
+*.lof
+*.lot
+*.pdf
+*.tar.bz2
+*.tar.gz
+*.tgz
+*.cache
+*.sxml
+*.o
+*.so
+*.import.scm
+*.import.c
+*.pid
+*.ctime
+*.c
+*.hlog
+manual/hato-manual*.html
+manual/hato-manual-Z-A.scm
+hato-mta
+hato-fetch
+hato-classify
+hato-cat
+hato-grep
+hato-httpd
+www
+
+syntax: regexp
+(^|/)roots/[^/]*/root/(var|home)($|/)
+

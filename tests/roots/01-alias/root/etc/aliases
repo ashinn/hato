@@ -1,0 +1,15 @@
+# outlaws of the marsh
+
+timely-rain: song-jiang
+welcome-rain: timely-rain
+nine-dragons: shi-jin
+sagacious-lu: lu-zhisen
+tatooed-monk: lu-zhisen
+lu-da: lu-zhisen
+black-whirlwind: li-kui
+iron-ox: li-kui
+
+# some lists
+
+all: song-jiang shi-jin lu-zhisen li-kui
+animals: nine-dragons iron-ox

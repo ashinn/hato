@@ -1,0 +1,21 @@
+From alice@domain3.domains Tue Jan 15 17:43:21 2008
+From: alice@domain3.domains
+To: bob@domain2.domains
+Subject: hello
+Date: Tue Jan 15 17:30:07 2008
+
+Message for Bob Smith
+
+-- 
+Alice
+
+From alice@domain3.domains Tue Jan 15 17:43:22 2008
+From: alice@domain3.domains
+To: bob@domain3.domains
+Subject: hello
+Date: Tue Jan 15 17:30:07 2008
+
+Message for Bob Smith
+
+-- 
+Alice

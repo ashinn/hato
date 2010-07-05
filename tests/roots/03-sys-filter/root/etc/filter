@@ -1,0 +1,6 @@
+;; -*- scheme -*-
+
+(cond
+ ((from? "spammer@castle.spamalot")
+  (reject)))
+

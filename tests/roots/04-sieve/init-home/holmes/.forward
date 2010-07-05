@@ -1,0 +1,13 @@
+# Sieve filter
+
+if size :over 1k {
+    reject text:
+Too big!
+.
+}
+
+if header :matches ["To", "Cc"] "*cases*" {
+    fileinto "work/";
+}
+
+
