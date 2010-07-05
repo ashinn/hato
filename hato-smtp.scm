@@ -247,7 +247,7 @@
        (let ((fd (unwrap-tcp-ports (smtp-in smtp) (smtp-out smtp))))
          (receive (in out) (ssl-wrap fd)
            (set-smtp-in! smtp in)
-           (set-smtp-out! smtp in)
+           (set-smtp-out! smtp out)
            #t))))
 
 (define (smtp-mail-from smtp address)
