@@ -445,9 +445,9 @@
         (mime-encode-ascii-header name val nl)
         (let* ((str (if charset (ces-convert val "UTF-8" charset) val))
                (encode (mime-choose-encoder str)))
-          (string-append name ": " (encode val (+ 2 (string-length name))
-                                           0 *default-max-col* nl))
-          ))))
+          (string-append name ": " (encode (or charset "UTF-8") val
+					   (+ 2 (string-length name))
+                                           *default-max-col* nl))))))
 
 (define *default-smtp-headers*
   `(Return-Path: Envelope-To: Delivery-Date: Received:
