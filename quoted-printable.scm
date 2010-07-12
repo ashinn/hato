@@ -87,7 +87,7 @@
                start-col max-col "=\r\n")))
 
 (define (quoted-printable-encode . o)
-  (display (apply (quoted-printable-encode-string o))))
+  (display (apply quoted-printable-encode-string o)))
 
 (define (quoted-printable-encode-header encoding . o)
   (let-optionals* o ((src (current-input-port))
