@@ -69,7 +69,7 @@
   smtp-mail smtp-rcpt smtp-data smtp-noop smtp-reset
   smtp-verify smtp-expand smtp-mail-from smtp-recipient
   smtp-status smtp-message smtp-help smtp?
-  domain-part local-part)
+  domain-part local-part current-rfc-2822-date-string)
 
 (import scheme chicken extras utils data-structures ports files posix
         srfi-1 srfi-69 tcp dns
@@ -117,6 +117,7 @@
 (define (smtp-write-data str out . o)
   (call-with-input-string str (cut apply copy-data-port <> out o)))
 
+;; this is just used for unique boundaries
 (define (current-seconds-string) ; trim the .0
   (let* ((now (number->string (current-seconds)))
          (now-len (string-length now)))
@@ -124,13 +125,23 @@
         (substring now 0 (- now-len 2))
         now)))
 
-;; ARGH!!! remove the stupid newline
-(define (current-date-string)
-  (let* ((s (seconds->string (current-seconds)))
-         (len (- (string-length s) 1)))
-    (if (eqv? #\newline (string-ref s len))
-        (substring s 0 len)
-        s)))
+;; RFC 2822 format: Tue, 16 Dec 2008 11:45:13 +0000
+(define current-rfc-2822-date-string
+  (let ((pad (lambda (n)
+               (string-append (if (< n 10) "0" "") (number->string n))))
+        (days '#("Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat"))
+        (months '#("Jan" "Feb" "Mar" "Apr" "May" "Jun"
+                   "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")))
+    (lambda ()
+      (let* ((t (seconds->local-time (current-seconds)))
+             (tz (vector-ref t 9)))
+        (string-append
+         (vector-ref days (vector-ref t 6)) ", " (pad (vector-ref t 3)) " "
+         (vector-ref months (vector-ref t 4)) " " (pad (+ 1900 (vector-ref t 5)))
+         " " (pad (vector-ref t 2)) ":" (pad (vector-ref t 1))
+         ":" (pad (vector-ref t 0)) " " (if (< tz 0) "-" "+")
+         (pad (quotient (abs tz) (* 60 60)))
+         (pad (remainder (quotient (* 100 (abs tz)) (* 60 60)) 100)))))))
 
 (define (get-user-name)
   (car (user-information (current-user-id))))
@@ -454,7 +465,7 @@
     (Message-Id: ,smtp-generate-msgid)
     (From: ,(lambda () (string-append (get-user-name) "@" (get-host-name))))
     Reply-To: To: Cc: (Subject: ,(lambda () ""))
-    (Date: ,current-date-string)
+    (Date: ,current-rfc-2822-date-string)
     X-Mailer: X-Accept-Language: User-Agent: Organization: X-Face:
     (Mime-Version: ,(lambda () *smtp-mime-version*)) X-Loop: X-Priority:
     ))
