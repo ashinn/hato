@@ -63,6 +63,8 @@
 (compile-module let-keywords)
 (compile-module lru-cache)
 (compile-module quoted-printable)
+(compile-module safe-io)
+(compile-module safe-eval)
 (compile-module hato-base64)
 (compile-module hato-uri)
 (compile-module hato-log)
