@@ -76,7 +76,7 @@
         autoload hato-archive hato-mime hato-base64 quoted-printable)
 
 (autoload charconv ces-convert)
-(autoload ssl ssl-wrap unwrap-tcp-ports)
+(autoload openssl ssl-make-i/o-ports net-unwrap-tcp-ports)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -255,8 +255,8 @@
 ;; code here.
 (define (smtp-starttls smtp)
   (and ((make-smtp-command 'STARTTLS) smtp)
-       (let ((fd (unwrap-tcp-ports (smtp-in smtp) (smtp-out smtp))))
-         (receive (in out) (ssl-wrap fd)
+       (let ((fd (net-unwrap-tcp-ports (smtp-in smtp) (smtp-out smtp))))
+         (receive (in out) (ssl-make-i/o-ports #f fd (smtp-in smtp) (smtp-out smtp))
            (set-smtp-in! smtp in)
            (set-smtp-out! smtp out)
            #t))))
