@@ -312,7 +312,7 @@
                       (import scheme chicken)
                       ,@(read-file in))))
         (eval body)
-        (global-ref (string->symbol handler-name))))))
+        (eval (string->symbol handler-name))))))
 
 (define (load-scheme-script path config)
   (hash-table-ref/load!
@@ -388,10 +388,11 @@
        (help "help|h" => show-help)
        (version "version|V" => show-version)
        (confdir "config-dir=s"
-                (or (getenv "HTTP_CONF_DIR")
+                (or (get-environment-variable "HTTP_CONF_DIR")
                     (if (zero? (current-user-id))
                         (string-append "/etc/" name)
-                        (string-append (getenv "HOME") "/" name))))
+                        (string-append (get-environment-variable "HOME")
+                                       "/" name))))
        (rcfile "config|c=s" (string-append confdir "/httpd.conf"))
        (docroot "root|r=s")
        (port "port|p=i")
