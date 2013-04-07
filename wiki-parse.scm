@@ -43,7 +43,7 @@
     (irregex-fold
      (caar ls)
      (lambda (i m x)
-       (let ((left (%irregex-multi-fold (cdr ls) str i (irregex-match-start m)))
+       (let ((left (%irregex-multi-fold (cdr ls) str i (irregex-match-start-index m)))
              (right (reverse (irregex-apply-match m (cdar ls)))))
          (append x left right)))
      '()
@@ -59,20 +59,6 @@
                  (cadr o)
                  (string-length str))))
     (%irregex-multi-fold ls str start end)))
-
-(define (irregex-split irx str)
-  (reverse
-   (irregex-fold
-    irx
-    (lambda (i m x)
-      (let ((j (irregex-match-start m)))
-        (if (> j i) (cons (substring str i j) x) x)))
-    '()
-    str
-    (lambda (i x)
-      (if (< i (- (string-length str) 1))
-          (cons (substring str i) x)
-          x)))))
 
 (define wiki-parse-inline
   (let ((wiki-bold-rx
