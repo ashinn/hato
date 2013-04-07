@@ -4,7 +4,7 @@
  (synopsis "Hato Mail Suite")
  (license "BSD")
  (category net)
- (needs autoload udp charconv tokyocabinet stty html-parser numbers openssl regex-case)
+ (needs autoload udp charconv tokyocabinet stty html-parser numbers openssl regex-case sendfile)
  (author "Alex Shinn")
  (files "hato.setup" "hato-mta.scm" "hato-fetch.scm"))
 
