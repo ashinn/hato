@@ -382,7 +382,8 @@
 
 (define (i3db-file-name key-size value-size)
   (sprintf "~A/.hato/spam-k~A-v~A.db"
-           (or (getenv "HOME") ".") (or key-size "0") value-size))
+           (or (get-environment-variable "HOME") ".")
+           (or key-size "0") value-size))
 
 (define (feature-fold sources
           #!key
